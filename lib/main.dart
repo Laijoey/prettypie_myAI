@@ -1,5 +1,11 @@
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
+import 'service.dart';
+import 'application.dart';
+import 'payment.dart';
+import 'notification.dart';
+import 'profile.dart';
+import 'settings.dart';
 
 void main() {
   runApp(const MyApp());
@@ -17,6 +23,15 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF1E446B)),
         useMaterial3: true,
       ),
+      routes: {
+        '/dashboard': (_) => const DashboardPage(),
+        '/services': (_) => const ServicePage(),
+        '/applications': (_) => const ApplicationPage(),
+        '/payments': (_) => const PaymentPage(),
+        '/notifications': (_) => const NotificationPage(),
+        '/profile': (_) => const ProfilePage(),
+        '/settings': (_) => const SettingsPage(),
+      },
       home: const LoginPage(),
     );
   }
@@ -115,7 +130,7 @@ class _BrandPanel extends StatelessWidget {
                 ),
                 const SizedBox(height: 30),
                 const Text(
-                  'SmartGOV Malaysia',
+                  'SmartGOV',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 48,
@@ -164,9 +179,7 @@ class _LoginPanelState extends State<_LoginPanel> {
   bool _rememberMe = false;
 
   void _openDashboard() {
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const DashboardPage()),
-    );
+    Navigator.of(context).pushReplacementNamed('/dashboard');
   }
 
   @override
@@ -567,7 +580,7 @@ class DashboardPage extends StatelessWidget {
             child: Row(
               children: [
                 const SizedBox(
-                  width: 255,
+                  width: 220,
                   child: _DashboardSidebar(),
                 ),
                 Expanded(
@@ -584,7 +597,7 @@ class DashboardPage extends StatelessWidget {
       floatingActionButton: FloatingActionButton(
         onPressed: () {},
         backgroundColor: const Color(0xFF1F4468),
-        child: const Icon(Icons.forum_outlined),
+        child: const Icon(Icons.smart_toy_outlined),
       ),
     );
   }
@@ -636,10 +649,10 @@ class _DashboardSidebar extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'MyGov Malaysia',
+                      'SmartGOV',
                       style: TextStyle(
                         color: Colors.white,
-                        fontSize: 28,
+                        fontSize: 20,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -679,10 +692,29 @@ class _DashboardSidebar extends StatelessWidget {
                         style: const TextStyle(
                           color: Color(0xFFC2D1DF),
                           fontWeight: FontWeight.w600,
-                          fontSize: 26,
+                          fontSize: 14,
                         ),
                       ),
-                      onTap: () {},
+                      onTap: () {
+                        if (item.title == 'Services') {
+                          Navigator.of(context).pushReplacementNamed('/services');
+                        }
+                        if (item.title == 'My Applications') {
+                          Navigator.of(context).pushReplacementNamed('/applications');
+                        }
+                        if (item.title == 'Payments') {
+                          Navigator.of(context).pushReplacementNamed('/payments');
+                        }
+                        if (item.title == 'Notifications') {
+                          Navigator.of(context).pushReplacementNamed('/notifications');
+                        }
+                        if (item.title == 'Profile') {
+                          Navigator.of(context).pushReplacementNamed('/profile');
+                        }
+                        if (item.title == 'Settings') {
+                          Navigator.of(context).pushReplacementNamed('/settings');
+                        }
+                      },
                     ),
                   ),
                 );
@@ -699,7 +731,7 @@ class _DashboardSidebar extends StatelessWidget {
                   'Logout',
                   style: TextStyle(
                     color: Color(0xFFC2D1DF),
-                    fontSize: 26,
+                    fontSize: 14,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -718,7 +750,7 @@ class _DashboardBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(28, 20, 26, 20),
+      padding: const EdgeInsets.fromLTRB(20, 14, 18, 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -733,7 +765,7 @@ class _DashboardBody extends StatelessWidget {
                       'Selamat Pagi, Ahmad 👋',
                       style: TextStyle(
                         color: Color(0xFF1E2D3F),
-                        fontSize: 44,
+                        fontSize: 30,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -742,7 +774,7 @@ class _DashboardBody extends StatelessWidget {
                       "Here's your government services overview",
                       style: TextStyle(
                         color: Color(0xFF6B7B8D),
-                        fontSize: 17,
+                        fontSize: 14,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -753,8 +785,8 @@ class _DashboardBody extends StatelessWidget {
                 clipBehavior: Clip.none,
                 children: [
                   Container(
-                    width: 40,
-                    height: 40,
+                    width: 34,
+                    height: 34,
                     decoration: const BoxDecoration(
                       color: Color(0xFFE9EDF2),
                       shape: BoxShape.circle,
@@ -762,14 +794,15 @@ class _DashboardBody extends StatelessWidget {
                     child: const Icon(
                       Icons.notifications_none_outlined,
                       color: Color(0xFF607489),
+                      size: 19,
                     ),
                   ),
                   Positioned(
                     right: -2,
                     top: -2,
                     child: Container(
-                      width: 20,
-                      height: 20,
+                      width: 16,
+                      height: 16,
                       decoration: const BoxDecoration(
                         color: Color(0xFFE53935),
                         shape: BoxShape.circle,
@@ -779,7 +812,7 @@ class _DashboardBody extends StatelessWidget {
                         '4',
                         style: TextStyle(
                           color: Colors.white,
-                          fontSize: 11,
+                          fontSize: 9,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -789,7 +822,7 @@ class _DashboardBody extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 14),
           const Row(
             children: [
               Expanded(
@@ -837,7 +870,7 @@ class _DashboardBody extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           Expanded(
             child: Row(
               children: const [
@@ -873,10 +906,10 @@ class _TopStatCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: const Color(0xFFF7F8FA),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: const Color(0xFFD9DEE5)),
       ),
       child: Column(
@@ -885,24 +918,24 @@ class _TopStatCard extends StatelessWidget {
           Row(
             children: [
               Container(
-                width: 40,
-                height: 40,
+                width: 34,
+                height: 34,
                 decoration: BoxDecoration(
                   color: iconBg,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(icon, color: iconColor, size: 20),
+                child: Icon(icon, color: iconColor, size: 18),
               ),
               const Spacer(),
-              const Icon(Icons.north_east, color: Color(0xFF7C8EA2), size: 18),
+              const Icon(Icons.north_east, color: Color(0xFF7C8EA2), size: 16),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
           Text(
             title,
             style: const TextStyle(
               color: Color(0xFF6B7B8D),
-              fontSize: 14,
+              fontSize: 12,
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -911,7 +944,7 @@ class _TopStatCard extends StatelessWidget {
             value,
             style: const TextStyle(
               color: Color(0xFF1E2D3F),
-              fontSize: 22,
+              fontSize: 18,
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -920,7 +953,7 @@ class _TopStatCard extends StatelessWidget {
             subtitle,
             style: const TextStyle(
               color: Color(0xFF7F8F9F),
-              fontSize: 13,
+              fontSize: 11,
             ),
           ),
         ],
@@ -935,10 +968,10 @@ class _NotificationsPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: const Color(0xFFF7F8FA),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: const Color(0xFFD9DEE5)),
       ),
       child: Column(
@@ -950,7 +983,7 @@ class _NotificationsPanel extends StatelessWidget {
                 'Notifications',
                 style: TextStyle(
                   color: Color(0xFF1E2D3F),
-                  fontSize: 36,
+                  fontSize: 24,
                   fontWeight: FontWeight.w700,
                 ),
               ),
@@ -959,13 +992,13 @@ class _NotificationsPanel extends StatelessWidget {
                 'View all →',
                 style: TextStyle(
                   color: Color(0xFF355977),
-                  fontSize: 17,
+                  fontSize: 13,
                   fontWeight: FontWeight.w600,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 10),
           Expanded(
             child: ListView(
               children: const [
@@ -1031,7 +1064,7 @@ class _NoticeTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
         color: urgent ? const Color(0xFFF9EFF0) : const Color(0xFFF0F3F6),
         borderRadius: BorderRadius.circular(12),
@@ -1039,15 +1072,15 @@ class _NoticeTile extends StatelessWidget {
       child: Row(
         children: [
           Container(
-            width: 38,
-            height: 38,
+            width: 32,
+            height: 32,
             decoration: BoxDecoration(
               color: iconBg,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(icon, color: iconColor, size: 20),
+            child: Icon(icon, color: iconColor, size: 16),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1056,7 +1089,7 @@ class _NoticeTile extends StatelessWidget {
                   title,
                   style: const TextStyle(
                     color: Color(0xFF1E2D3F),
-                    fontSize: 16,
+                    fontSize: 13,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -1065,7 +1098,7 @@ class _NoticeTile extends StatelessWidget {
                   subtitle,
                   style: const TextStyle(
                     color: Color(0xFF7D8D9D),
-                    fontSize: 13,
+                    fontSize: 11,
                   ),
                 ),
               ],
@@ -1073,7 +1106,7 @@ class _NoticeTile extends StatelessWidget {
           ),
           if (urgent)
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
                 color: const Color(0xFFF8D6D8),
                 borderRadius: BorderRadius.circular(999),
@@ -1082,7 +1115,7 @@ class _NoticeTile extends StatelessWidget {
                 'Urgent',
                 style: TextStyle(
                   color: Color(0xFFF04E4E),
-                  fontSize: 13,
+                  fontSize: 11,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -1099,10 +1132,10 @@ class _QuickActionsPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: const Color(0xFFF7F8FA),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: const Color(0xFFD9DEE5)),
       ),
       child: Column(
@@ -1112,17 +1145,17 @@ class _QuickActionsPanel extends StatelessWidget {
             'Quick Actions',
             style: TextStyle(
               color: Color(0xFF1E2D3F),
-              fontSize: 36,
+              fontSize: 24,
               fontWeight: FontWeight.w700,
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           Expanded(
             child: GridView.count(
               crossAxisCount: 2,
-              mainAxisSpacing: 10,
-              crossAxisSpacing: 10,
-              childAspectRatio: 1.35,
+              mainAxisSpacing: 8,
+              crossAxisSpacing: 8,
+              childAspectRatio: 1.2,
               children: [
                 _QuickActionTile(
                   label: 'Pay Summons',
@@ -1166,20 +1199,20 @@ class _QuickActionTile extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
-            width: 40,
-            height: 40,
+            width: 34,
+            height: 34,
             decoration: BoxDecoration(
               color: const Color(0xFFD8E0EA),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(icon, color: const Color(0xFF2D4A68), size: 22),
+            child: Icon(icon, color: const Color(0xFF2D4A68), size: 18),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Text(
             label,
             style: const TextStyle(
               color: Color(0xFF2A3E55),
-              fontSize: 15,
+              fontSize: 13,
               fontWeight: FontWeight.w600,
             ),
             textAlign: TextAlign.center,
