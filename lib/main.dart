@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
+import 'chat_assistant_fab.dart';
 import 'service.dart';
 import 'application.dart';
 import 'payment.dart';
@@ -594,11 +595,7 @@ class DashboardPage extends StatelessWidget {
           ),
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {},
-        backgroundColor: const Color(0xFF1F4468),
-        child: const Icon(Icons.smart_toy_outlined),
-      ),
+      floatingActionButton: const ChatAssistantFab(),
     );
   }
 }
@@ -765,7 +762,7 @@ class _DashboardBody extends StatelessWidget {
                       'Selamat Pagi, Ahmad 👋',
                       style: TextStyle(
                         color: Color(0xFF1E2D3F),
-                        fontSize: 30,
+                        fontSize: 28,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -781,44 +778,49 @@ class _DashboardBody extends StatelessWidget {
                   ],
                 ),
               ),
-              Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  Container(
-                    width: 34,
-                    height: 34,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFFE9EDF2),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.notifications_none_outlined,
-                      color: Color(0xFF607489),
-                      size: 19,
-                    ),
-                  ),
-                  Positioned(
-                    right: -2,
-                    top: -2,
-                    child: Container(
-                      width: 16,
-                      height: 16,
+              GestureDetector(
+                onTap: () {
+                  Navigator.of(context).pushReplacementNamed('/notifications');
+                },
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Container(
+                      width: 34,
+                      height: 34,
                       decoration: const BoxDecoration(
-                        color: Color(0xFFE53935),
+                        color: Color(0xFFE9EDF2),
                         shape: BoxShape.circle,
                       ),
-                      alignment: Alignment.center,
-                      child: const Text(
-                        '4',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 9,
-                          fontWeight: FontWeight.bold,
+                      child: const Icon(
+                        Icons.notifications_none_outlined,
+                        color: Color(0xFF607489),
+                        size: 19,
+                      ),
+                    ),
+                    Positioned(
+                      right: -2,
+                      top: -2,
+                      child: Container(
+                        width: 16,
+                        height: 16,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFE53935),
+                          shape: BoxShape.circle,
+                        ),
+                        alignment: Alignment.center,
+                        child: const Text(
+                          '4',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ],
           ),
@@ -977,9 +979,9 @@ class _NotificationsPanel extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             children: [
-              Text(
+              const Text(
                 'Notifications',
                 style: TextStyle(
                   color: Color(0xFF1E2D3F),
@@ -987,13 +989,18 @@ class _NotificationsPanel extends StatelessWidget {
                   fontWeight: FontWeight.w700,
                 ),
               ),
-              Spacer(),
-              Text(
-                'View all →',
-                style: TextStyle(
-                  color: Color(0xFF355977),
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
+              const Spacer(),
+              GestureDetector(
+                onTap: () {
+                  Navigator.of(context).pushReplacementNamed('/notifications');
+                },
+                child: const Text(
+                  'View all →',
+                  style: TextStyle(
+                    color: Color(0xFF355977),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ],
@@ -1006,8 +1013,8 @@ class _NotificationsPanel extends StatelessWidget {
                   icon: Icons.directions_car_outlined,
                   iconColor: Color(0xFFF04E4E),
                   iconBg: Color(0xFFFDEDEE),
-                  title: 'Road tax expires in 14 days',
-                  subtitle: 'JPJ',
+                  title: 'Road tax renewal due in 5 days',
+                  subtitle: 'JPJ - Renew before 19 Apr 2026',
                   urgent: true,
                 ),
                 SizedBox(height: 10),
@@ -1015,25 +1022,57 @@ class _NotificationsPanel extends StatelessWidget {
                   icon: Icons.warning_amber_outlined,
                   iconColor: Color(0xFFF04E4E),
                   iconBg: Color(0xFFFDEDEE),
-                  title: '2 unpaid summons detected',
-                  subtitle: 'PDRM',
+                  title: 'Traffic summons payment due soon',
+                  subtitle: 'PDRM - Due by 16 Apr 2026',
                   urgent: true,
                 ),
                 SizedBox(height: 10),
                 _NoticeTile(
-                  icon: Icons.card_giftcard,
+                  icon: Icons.account_balance_wallet_outlined,
                   iconColor: Color(0xFF2ECC71),
                   iconBg: Color(0xFFE8F6EE),
-                  title: 'You may be eligible for STR aid',
-                  subtitle: 'PADU',
+                  title: 'STR Phase 2 payment credited',
+                  subtitle: 'LHDN - RM 300 credited to bank account',
                 ),
                 SizedBox(height: 10),
                 _NoticeTile(
-                  icon: Icons.check_circle_outline,
+                  icon: Icons.event_available_outlined,
                   iconColor: Color(0xFF2ECC71),
                   iconBg: Color(0xFFE8F6EE),
-                  title: 'eKasih application approved',
-                  subtitle: 'ICU JPM',
+                  title: 'Passport renewal appointment confirmed',
+                  subtitle: 'JIM - 22 Apr 2026, UTC Pudu',
+                ),
+                SizedBox(height: 10),
+                _NoticeTile(
+                  icon: Icons.school_outlined,
+                  iconColor: Color(0xFF3DA5F5),
+                  iconBg: Color(0xFFE8F4FE),
+                  title: 'PTPTN payment due in 3 days',
+                  subtitle: 'PTPTN - RM 120 due on 17 Apr 2026',
+                ),
+                SizedBox(height: 10),
+                _NoticeTile(
+                  icon: Icons.local_hospital_outlined,
+                  iconColor: Color(0xFFF5A623),
+                  iconBg: Color(0xFFFFF3E6),
+                  title: 'Clinic appointment reminder',
+                  subtitle: 'KKM - 18 Apr 2026, Klinik Kesihatan Cheras',
+                ),
+                SizedBox(height: 10),
+                _NoticeTile(
+                  icon: Icons.badge_outlined,
+                  iconColor: Color(0xFF3DA5F5),
+                  iconBg: Color(0xFFE8F4FE),
+                  title: 'MyKad address update pending verification',
+                  subtitle: 'JPN - Submit utility bill to complete request',
+                ),
+                SizedBox(height: 10),
+                _NoticeTile(
+                  icon: Icons.receipt_long_outlined,
+                  iconColor: Color(0xFF2ECC71),
+                  iconBg: Color(0xFFE8F6EE),
+                  title: 'Income tax e-Receipt available',
+                  subtitle: 'LHDN - YA2025 filing receipt ready to download',
                 ),
               ],
             ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'chat_assistant_fab.dart';
 
 class ApplicationPage extends StatelessWidget {
   const ApplicationPage({super.key});
@@ -29,11 +30,7 @@ class ApplicationPage extends StatelessWidget {
           ),
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {},
-        backgroundColor: const Color(0xFF1F4468),
-        child: const Icon(Icons.smart_toy_outlined),
-      ),
+      floatingActionButton: const ChatAssistantFab(),
     );
   }
 }
@@ -193,7 +190,7 @@ class _ApplicationBody extends StatelessWidget {
             'My Applications',
             style: TextStyle(
               color: Color(0xFF1E2D3F),
-              fontSize: 30,
+              fontSize: 28,
               fontWeight: FontWeight.w700,
             ),
           ),

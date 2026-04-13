@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'chat_assistant_fab.dart';
 
 class ServicePage extends StatelessWidget {
   const ServicePage({super.key});
@@ -29,11 +30,7 @@ class ServicePage extends StatelessWidget {
           ),
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {},
-        backgroundColor: const Color(0xFF1F4468),
-        child: const Icon(Icons.smart_toy_outlined),
-      ),
+      floatingActionButton: const ChatAssistantFab(),
     );
   }
 }
@@ -197,7 +194,7 @@ class _ServicesBody extends StatelessWidget {
                   'Government Services',
                   style: TextStyle(
                     color: Color(0xFF1E2D3F),
-                    fontSize: 30,
+                    fontSize: 28,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -236,11 +233,12 @@ class _SearchServicesField extends StatelessWidget {
   Widget build(BuildContext context) {
     return TextField(
       decoration: InputDecoration(
+        isDense: true,
         hintText: 'Search services... (e.g. renew license, check tax, apply bantuan)',
         prefixIcon: const Icon(Icons.search),
         filled: true,
         fillColor: const Color(0xFFF2F4F7),
-        contentPadding: const EdgeInsets.symmetric(vertical: 12),
+        contentPadding: const EdgeInsets.symmetric(vertical: 8),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: const BorderSide(color: Color(0xFFD9DEE5)),
@@ -293,67 +291,557 @@ class _ServiceGrid extends StatelessWidget {
       ),
       itemBuilder: (context, index) {
         final item = items[index];
-        return _ServiceTile(item: item, showArrow: popular);
+        return _ServiceTile(
+          item: item,
+          showArrow: popular,
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => _ServiceActionPage(item: item),
+              ),
+            );
+          },
+        );
       },
     );
   }
 }
 
 class _ServiceTile extends StatelessWidget {
-  const _ServiceTile({required this.item, required this.showArrow});
+  const _ServiceTile({
+    required this.item,
+    required this.showArrow,
+    required this.onTap,
+  });
 
   final _ServiceItem item;
   final bool showArrow;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF7F8FA),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFD9DEE5)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: item.iconBg,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(item.icon, color: item.iconColor, size: 18),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      item.title,
+                      style: const TextStyle(
+                        color: Color(0xFF1E2D3F),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      item.subtitle,
+                      style: const TextStyle(
+                        color: Color(0xFF7D8D9D),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (showArrow)
+                const Icon(
+                  Icons.arrow_forward_ios,
+                  color: Color(0xFF7D8D9D),
+                  size: 14,
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ServiceActionPage extends StatefulWidget {
+  const _ServiceActionPage({required this.item});
+
+  final _ServiceItem item;
+
+  @override
+  State<_ServiceActionPage> createState() => _ServiceActionPageState();
+}
+
+class _ServiceActionPageState extends State<_ServiceActionPage> {
+  final _formKey = GlobalKey<FormState>();
+  final _tinController = TextEditingController();
+  final _idController = TextEditingController();
+  final _amountController = TextEditingController();
+  String _taxType = 'Income Tax (Cukai Pendapatan)';
+  String _assessmentYear = '${DateTime.now().year}';
+  String _paymentCode = '084';
+
+  bool get _isTaxFiling => widget.item.title == 'Tax Filing';
+
+  @override
+  void dispose() {
+    _tinController.dispose();
+    _idController.dispose();
+    _amountController.dispose();
+    super.dispose();
+  }
+
+  void _submitTaxPayment() {
+    if (!(_formKey.currentState?.validate() ?? false)) {
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Tax details saved. Continue to payment.')),
+    );
+    Navigator.of(context).pushNamed('/payments');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF5F5F7),
+      appBar: AppBar(
+        title: Text(widget.item.title),
+        backgroundColor: Colors.transparent,
+        foregroundColor: const Color(0xFF1E2D3F),
+        elevation: 0,
+        scrolledUnderElevation: 0,
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFD9DEE5)),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: widget.item.iconBg,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(widget.item.icon, color: widget.item.iconColor),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.item.title,
+                          style: const TextStyle(
+                            color: Color(0xFF1E2D3F),
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          'Agency: ${widget.item.subtitle}',
+                          style: const TextStyle(
+                            color: Color(0xFF6F8094),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+            Expanded(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  return SingleChildScrollView(
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                      child: _isTaxFiling ? _buildTaxForm() : _buildGenericForm(),
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              height: 42,
+              child: FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF214B74),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                onPressed: _isTaxFiling
+                    ? _submitTaxPayment
+                    : () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('${widget.item.title} service started.'),
+                          ),
+                        );
+                      },
+                child: Text(
+                  _isTaxFiling ? 'Pay Tax Now' : 'Proceed',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGenericForm() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFFF7F8FA),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: const Color(0xFFD9DEE5)),
       ),
-      child: Row(
+      child: const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 34,
-            height: 34,
-            decoration: BoxDecoration(
-              color: item.iconBg,
-              borderRadius: BorderRadius.circular(10),
+          Text(
+            'Start Service',
+            style: TextStyle(
+              color: Color(0xFF1E2D3F),
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
             ),
-            child: Icon(item.icon, color: item.iconColor, size: 18),
           ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  item.title,
-                  style: const TextStyle(
-                    color: Color(0xFF1E2D3F),
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
+          SizedBox(height: 10),
+          TextField(
+            decoration: InputDecoration(
+              labelText: 'Identification Number',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          SizedBox(height: 10),
+          TextField(
+            decoration: InputDecoration(
+              labelText: 'Reference (optional)',
+              border: OutlineInputBorder(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTaxForm() {
+    final years = List.generate(8, (index) => '${DateTime.now().year - index}');
+    if (!years.contains(_assessmentYear)) {
+      years.add(_assessmentYear);
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFD9DEE5)),
+      ),
+      child: Form(
+        key: _formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Tax Payment Details',
+              style: TextStyle(
+                color: Color(0xFF1E2D3F),
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Container(
+              width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                      color: const Color(0xFFF5F8FC),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFFDCE5F0)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFE8F4FE),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Icon(
+                                Icons.upload_file_outlined,
+                                color: Color(0xFF3DA5F5),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            const Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Upload Tax Document',
+                                    style: TextStyle(
+                                      color: Color(0xFF1E2D3F),
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  SizedBox(height: 2),
+                                  Text(
+                                    'UI only for now. Uploaded tax document will be used to auto-fill this form later.',
+                                    style: TextStyle(
+                                      color: Color(0xFF607489),
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 40,
+                          child: OutlinedButton.icon(
+                            onPressed: () {},
+                            icon: const Icon(Icons.file_upload_outlined),
+                            label: const Text('Choose Document'),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: const Color(0xFFDCE5F0)),
+                          ),
+                          child: const Text(
+                            'Accepted file: PDF, image, or document upload placeholder',
+                            style: TextStyle(
+                              color: Color(0xFF6F8094),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
+            const SizedBox(height: 12),
+            const Text(
+              '1. Tax Identification Number (TIN)',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'Your personal tax number (e.g. SGXXXXXXXX / OGXXXXXXXX).',
+              style: TextStyle(color: Color(0xFF6F8094), fontSize: 12),
+            ),
+            const SizedBox(height: 8),
+            TextFormField(
+              controller: _tinController,
+              decoration: const InputDecoration(
+                labelText: 'Tax Identification Number (TIN)',
+                border: OutlineInputBorder(),
+              ),
+              validator: (value) =>
+                  (value == null || value.trim().isEmpty) ? 'TIN is required' : null,
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              '2. Identification Number',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'Use IC (MyKad) for Malaysians or Passport for foreigners.',
+              style: TextStyle(color: Color(0xFF6F8094), fontSize: 12),
+            ),
+            const SizedBox(height: 8),
+            TextFormField(
+              controller: _idController,
+              decoration: const InputDecoration(
+                labelText: 'IC / Passport Number',
+                border: OutlineInputBorder(),
+              ),
+              validator: (value) => (value == null || value.trim().isEmpty)
+                  ? 'Identification number is required'
+                  : null,
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              '3. Type of Tax',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 8),
+            DropdownButtonFormField<String>(
+              value: _taxType,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+              ),
+              items: const [
+                DropdownMenuItem(
+                  value: 'Income Tax (Cukai Pendapatan)',
+                  child: Text('Income Tax (Cukai Pendapatan)'),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  item.subtitle,
-                  style: const TextStyle(
-                    color: Color(0xFF7D8D9D),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                  ),
+                DropdownMenuItem(
+                  value: 'PCB Balance',
+                  child: Text('PCB Balance'),
                 ),
               ],
+              onChanged: (value) {
+                if (value != null) {
+                  setState(() {
+                    _taxType = value;
+                  });
+                }
+              },
             ),
-          ),
-          if (showArrow)
-            const Icon(Icons.arrow_forward_ios, color: Color(0xFF7D8D9D), size: 14),
-        ],
+            const SizedBox(height: 12),
+            const Text(
+              '4. Assessment Year (Tahun Taksiran)',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'Wrong year can result in incorrect payment records.',
+              style: TextStyle(color: Color(0xFF6F8094), fontSize: 12),
+            ),
+            const SizedBox(height: 8),
+            DropdownButtonFormField<String>(
+              value: _assessmentYear,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+              ),
+              items: years
+                  .map(
+                    (year) => DropdownMenuItem<String>(
+                      value: year,
+                      child: Text(year),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (value) {
+                if (value != null) {
+                  setState(() {
+                    _assessmentYear = value;
+                  });
+                }
+              },
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              '5. Payment Code',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              '084 is commonly used for balance of tax payment.',
+              style: TextStyle(color: Color(0xFF6F8094), fontSize: 12),
+            ),
+            const SizedBox(height: 8),
+            DropdownButtonFormField<String>(
+              value: _paymentCode,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+              ),
+              items: const [
+                DropdownMenuItem(value: '084', child: Text('084 - Balance of tax')),
+                DropdownMenuItem(value: '085', child: Text('085 - CP500 installment')),
+                DropdownMenuItem(value: '086', child: Text('086 - Additional assessment')),
+              ],
+              onChanged: (value) {
+                if (value != null) {
+                  setState(() {
+                    _paymentCode = value;
+                  });
+                }
+              },
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              '6. Amount (RM)',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 8),
+            TextFormField(
+              controller: _amountController,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(
+                labelText: 'Amount to pay (RM)',
+                border: OutlineInputBorder(),
+              ),
+              validator: (value) {
+                if (value == null || value.trim().isEmpty) {
+                  return 'Amount is required';
+                }
+                final amount = double.tryParse(value);
+                if (amount == null || amount <= 0) {
+                  return 'Enter a valid amount';
+                }
+                return null;
+              },
+            ),
+          ],
+        ),
       ),
     );
   }

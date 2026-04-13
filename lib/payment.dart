@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'chat_assistant_fab.dart';
 
 class PaymentPage extends StatelessWidget {
   const PaymentPage({super.key});
@@ -29,11 +30,7 @@ class PaymentPage extends StatelessWidget {
           ),
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {},
-        backgroundColor: const Color(0xFF1F4468),
-        child: const Icon(Icons.smart_toy_outlined),
-      ),
+      floatingActionButton: const ChatAssistantFab(),
     );
   }
 }
@@ -184,34 +181,41 @@ class _PaymentBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(20, 14, 18, 14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: const [
-          Text(
-            'Payments',
-            style: TextStyle(
-              color: Color(0xFF1E2D3F),
-              fontSize: 30,
-              fontWeight: FontWeight.w700,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 14, 18, 14),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight - 28),
+            child: const Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Payments',
+                  style: TextStyle(
+                    color: Color(0xFF1E2D3F),
+                    fontSize: 28,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                SizedBox(height: 6),
+                Text(
+                  'Pay your government bills securely in one place',
+                  style: TextStyle(
+                    color: Color(0xFF6B7B8D),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                SizedBox(height: 16),
+                _OutstandingBillsCard(),
+                SizedBox(height: 18),
+                _MakePaymentCard(),
+              ],
             ),
           ),
-          SizedBox(height: 6),
-          Text(
-            'Pay your government bills securely in one place',
-            style: TextStyle(
-              color: Color(0xFF6B7B8D),
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          SizedBox(height: 16),
-          _OutstandingBillsCard(),
-          SizedBox(height: 18),
-          _MakePaymentCard(),
-        ],
-      ),
+        );
+      },
     );
   }
 }
@@ -390,7 +394,7 @@ class _MakePaymentCardState extends State<_MakePaymentCard> {
                 child: _PaymentField(
                   label: 'Agency',
                   child: DropdownButtonFormField<String>(
-                    value: _selectedAgency,
+                    initialValue: _selectedAgency,
                     items: const [
                       DropdownMenuItem(value: 'PDRM', child: Text('PDRM')),
                       DropdownMenuItem(value: 'JPJ', child: Text('JPJ')),

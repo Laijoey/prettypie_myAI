@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'chat_assistant_fab.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
@@ -29,11 +30,7 @@ class SettingsPage extends StatelessWidget {
           ),
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {},
-        backgroundColor: const Color(0xFF1F4468),
-        child: const Icon(Icons.smart_toy_outlined),
-      ),
+      floatingActionButton: const ChatAssistantFab(),
     );
   }
 }
@@ -203,7 +200,7 @@ class _SettingsBodyState extends State<_SettingsBody> {
             'Settings',
             style: TextStyle(
               color: Color(0xFF1E2D3F),
-              fontSize: 30,
+              fontSize: 28,
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -436,7 +433,7 @@ class _ToggleRow extends StatelessWidget {
           Switch(
             value: value,
             onChanged: onChanged,
-            activeColor: const Color(0xFF2DBE63),
+            activeThumbColor: const Color(0xFF2DBE63),
           ),
         ],
       ),
