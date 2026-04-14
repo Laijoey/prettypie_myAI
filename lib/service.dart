@@ -402,6 +402,11 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
   String _paymentCode = '084';
 
   bool get _isTaxFiling => widget.item.title == 'Tax Filing';
+  bool get _isEpfManagement => widget.item.title == 'EPF Management';
+  bool get _isHealthService => widget.item.title == 'Health Services';
+  bool get _isLoanPayment => widget.item.title == 'Loan Payment';
+  bool get _isLicenseRenewal => widget.item.title == 'License Renewal';
+  bool get _isSummonsPayment => widget.item.title == 'Summons Payment';
 
   @override
   void dispose() {
@@ -492,7 +497,19 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
                   return SingleChildScrollView(
                     child: ConstrainedBox(
                       constraints: BoxConstraints(minHeight: constraints.maxHeight),
-                      child: _isTaxFiling ? _buildTaxForm() : _buildGenericForm(),
+                      child: _isTaxFiling
+                          ? _buildTaxForm()
+                          : _isEpfManagement
+                              ? _buildEpfForm()
+                              : _isHealthService
+                                  ? _buildHealthForm()
+                                  : _isLoanPayment
+                                      ? _buildLoanPaymentForm()
+                                      : _isLicenseRenewal
+                                          ? _buildLicenseRenewalForm()
+                                              : _isSummonsPayment
+                                                  ? _buildSummonsPaymentForm()
+                                          : _buildGenericForm(),
                     ),
                   );
                 },
@@ -566,6 +583,1093 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
               labelText: 'Reference (optional)',
               border: OutlineInputBorder(),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEpfForm() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFD9DEE5)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'EPF Document Upload',
+            style: TextStyle(
+              color: Color(0xFF1E2D3F),
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Upload your supporting documents before continuing with EPF services.',
+            style: TextStyle(
+              color: Color(0xFF6F8094),
+              fontSize: 12,
+            ),
+          ),
+          const SizedBox(height: 14),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF5F8FC),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFDCE5F0)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE8F4FE),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(
+                        Icons.upload_file_outlined,
+                        color: Color(0xFF3DA5F5),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Upload document',
+                            style: TextStyle(
+                              color: Color(0xFF1E2D3F),
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          SizedBox(height: 2),
+                          Text(
+                            'PDF, JPG, PNG up to 10MB each. Scan clearly for faster verification.',
+                            style: TextStyle(
+                              color: Color(0xFF607489),
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  height: 42,
+                  child: OutlinedButton.icon(
+                    onPressed: () {},
+                    icon: const Icon(Icons.file_upload_outlined),
+                    label: const Text('Choose File'),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFDCE5F0)),
+                  ),
+                  child: const Text(
+                    'Accepted files: identification proof, employment letter, salary slip, EPF statement, or any supporting PDF/image.',
+                    style: TextStyle(
+                      color: Color(0xFF6F8094),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+          const Text(
+            'Suggested documents',
+            style: TextStyle(
+              color: Color(0xFF1E2D3F),
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 10),
+          _buildDocumentChip('MyKad / Passport copy'),
+          _buildDocumentChip('Employment confirmation letter'),
+          _buildDocumentChip('Latest salary slip'),
+          _buildDocumentChip('EPF account statement'),
+          _buildDocumentChip('Supporting withdrawal or contribution document'),
+          const SizedBox(height: 14),
+          _buildInfoSection(
+            '1. Member (User) Information',
+            [
+              _buildInfoField('Full Name'),
+              _buildInfoField('IC Number (MyKad)'),
+              _buildInfoPair('Date of Birth', 'Gender'),
+              _buildInfoPair('Phone Number', 'Email Address'),
+              _buildInfoField('Address'),
+              _buildInfoField('Employment Status'),
+            ],
+          ),
+          _buildInfoSection(
+            '2. Employment Details',
+            [
+              _buildInfoPair('Employer Name', 'Company ID'),
+              _buildInfoPair('Start Date of Employment', 'Employment Type'),
+              _buildInfoField('Salary Amount (RM)'),
+            ],
+          ),
+          _buildInfoSection(
+            '3. Contribution Information',
+            [
+              _buildInfoPair('Employee Contribution (%)', 'Employee Contribution (RM)'),
+              _buildInfoPair('Employer Contribution (%)', 'Employer Contribution (RM)'),
+              _buildInfoField('Monthly Contribution Records'),
+              _buildInfoPair('Contribution Date', 'Total Accumulated Balance (RM)'),
+            ],
+          ),
+          _buildInfoSection(
+            '4. Account Structure',
+            [
+              _buildInfoPair('Account 1 Balance (RM)', 'Account 2 Balance (RM)'),
+              _buildInfoField('Account 3 Balance (optional)'),
+              _buildInfoField('Transaction History Summary'),
+            ],
+          ),
+          _buildInfoSection(
+            '5. Transaction Records',
+            [
+              _buildInfoField('Monthly Deposits'),
+              _buildInfoField('Withdrawals'),
+              _buildInfoField('Transfers Between Accounts'),
+              _buildInfoField('Dividend Payments'),
+            ],
+          ),
+          _buildInfoSection(
+            '6. Dividend / Interest Info',
+            [
+              _buildInfoPair('Annual Dividend Rate (%)', 'Dividend Earned Per Year (RM)'),
+              _buildInfoField('Historical Dividend Records'),
+            ],
+          ),
+          _buildInfoSection(
+            '7. Withdrawal Management',
+            [
+              _buildInfoField('Type of Withdrawal (housing, education, etc.)'),
+              _buildInfoPair('Amount Withdrawn (RM)', 'Date of Withdrawal'),
+              _buildInfoField('Approval Status'),
+            ],
+          ),
+          _buildInfoSection(
+            '8. Login & Security',
+            [
+              _buildInfoField('Username / ID'),
+              _buildInfoField('Password (encrypted placeholder)'),
+              _buildInfoField('Authentication Method (OTP, etc.)'),
+            ],
+          ),
+          _buildInfoSection(
+            '9. Reports / Summary',
+            [
+              _buildInfoField('Annual Statement'),
+              _buildInfoField('Contribution Summary'),
+              _buildInfoField('Total Savings Overview'),
+              _buildInfoField('Retirement Savings Simulation'),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoSection(String title, List<Widget> children) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFD9E2EC)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              color: Color(0xFF1E2D3F),
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 10),
+          ...children,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoField(String label) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: TextField(
+        decoration: InputDecoration(
+          labelText: label,
+          border: const OutlineInputBorder(),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoPair(String leftLabel, String rightLabel) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        children: [
+          Expanded(child: _buildInfoField(leftLabel)),
+          const SizedBox(width: 10),
+          Expanded(child: _buildInfoField(rightLabel)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHealthForm() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFD9DEE5)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Health Service Registration',
+            style: TextStyle(
+              color: Color(0xFF1E2D3F),
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Upload supporting documents, then fill in the required health registration details manually.',
+            style: TextStyle(
+              color: Color(0xFF6F8094),
+              fontSize: 12,
+            ),
+          ),
+          const SizedBox(height: 14),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF5F8FC),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFDCE5F0)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE8F4FE),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(
+                        Icons.upload_file_outlined,
+                        color: Color(0xFF3DA5F5),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Upload health document',
+                            style: TextStyle(
+                              color: Color(0xFF1E2D3F),
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          SizedBox(height: 2),
+                          Text(
+                            'Medical card, referral letter, or previous reports (UI placeholder only).',
+                            style: TextStyle(
+                              color: Color(0xFF607489),
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  height: 42,
+                  child: OutlinedButton.icon(
+                    onPressed: () {},
+                    icon: const Icon(Icons.file_upload_outlined),
+                    label: const Text('Choose Document'),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFDCE5F0)),
+                  ),
+                  child: const Text(
+                    'Accepted files: PDF, JPG, PNG (ID card, insurance card, medical report).',
+                    style: TextStyle(
+                      color: Color(0xFF6F8094),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+          _buildInfoSection(
+            '1. Personal Information (Basic Identity)',
+            [
+              _buildInfoField('Full Name'),
+              _buildInfoField('IC Number / Passport'),
+              _buildInfoPair('Date of Birth', 'Gender'),
+              _buildInfoField('Nationality'),
+            ],
+          ),
+          _buildInfoSection(
+            '2. Contact Information',
+            [
+              _buildInfoPair('Phone Number', 'Email Address'),
+              _buildInfoField('Home Address'),
+            ],
+          ),
+          _buildInfoSection(
+            '3. Health Profile (Very Important)',
+            [
+              _buildInfoField('Blood Type (if known)'),
+              _buildInfoField('Allergies (medication, food, etc.)'),
+              _buildInfoField('Existing Medical Conditions (diabetes, asthma, etc.)'),
+              _buildInfoField('Current Medications'),
+            ],
+          ),
+          _buildInfoSection(
+            '4. Emergency Contact',
+            [
+              _buildInfoField('Emergency Contact Name'),
+              _buildInfoPair('Relationship', 'Emergency Contact Phone Number'),
+            ],
+          ),
+          _buildInfoSection(
+            '5. Insurance / Payment Info',
+            [
+              _buildInfoField('Insurance Provider (if any)'),
+              _buildInfoField('Policy Number'),
+              _buildInfoField('Payment Method'),
+            ],
+          ),
+          _buildInfoSection(
+            '6. Appointment / Service Details',
+            [
+              _buildInfoField('Type of Service (check-up, vaccination, etc.)'),
+              _buildInfoPair('Preferred Date & Time', 'Selected Clinic / Hospital'),
+            ],
+          ),
+          _buildInfoSection(
+            '7. Health ID / Integration',
+            [
+              _buildInfoField('MyKad Number (Main ID)'),
+              _buildInfoField('Link to Government Systems (optional)'),
+            ],
+          ),
+          _buildInfoSection(
+            '8. Account & Login',
+            [
+              _buildInfoField('Username / Email'),
+              _buildInfoField('Password'),
+              _buildInfoField('OTP / Verification'),
+            ],
+          ),
+          _buildInfoSection(
+            '9. Consent & Declarations',
+            [
+              _buildInfoField('Consent to Share Medical Data (Yes/No)'),
+              _buildInfoField('Agreement to Terms & Privacy Policy (Yes/No)'),
+            ],
+          ),
+          _buildInfoSection(
+            'MVP Quick Registration',
+            [
+              _buildInfoPair('Name', 'IC Number'),
+              _buildInfoField('Phone Number'),
+              _buildInfoField('Allergy + Medical Condition Summary'),
+              _buildInfoField('Appointment Booking Notes'),
+              _buildInfoField('Emergency Contact (Name + Phone)'),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLoanPaymentForm() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFD9DEE5)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'PTPTN Loan Payment',
+            style: TextStyle(
+              color: Color(0xFF1E2D3F),
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Upload supporting documents and fill in payment details manually.',
+            style: TextStyle(
+              color: Color(0xFF6F8094),
+              fontSize: 12,
+            ),
+          ),
+          const SizedBox(height: 14),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF5F8FC),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFDCE5F0)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE8F4FE),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(
+                        Icons.upload_file_outlined,
+                        color: Color(0xFF3DA5F5),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Upload payment document',
+                            style: TextStyle(
+                              color: Color(0xFF1E2D3F),
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          SizedBox(height: 2),
+                          Text(
+                            'Optional: PTPTN statement, previous receipt, or payment reference slip.',
+                            style: TextStyle(
+                              color: Color(0xFF607489),
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  height: 42,
+                  child: OutlinedButton.icon(
+                    onPressed: () {},
+                    icon: const Icon(Icons.file_upload_outlined),
+                    label: const Text('Choose Document'),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFDCE5F0)),
+                  ),
+                  child: const Text(
+                    'Accepted files: PDF, JPG, PNG. UI only (no backend upload).',
+                    style: TextStyle(
+                      color: Color(0xFF6F8094),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+          _buildInfoSection(
+            '1. Borrower Identification (VERY IMPORTANT)',
+            [
+              _buildInfoField('Full Name'),
+              _buildInfoField('IC Number (MyKad)'),
+              _buildInfoField('PTPTN Loan Number (if available)'),
+            ],
+          ),
+          _buildInfoSection(
+            '2. Contact Information',
+            [
+              _buildInfoPair('Phone Number', 'Email Address'),
+            ],
+          ),
+          _buildInfoSection(
+            '3. Loan Details',
+            [
+              _buildInfoField('Outstanding Balance (auto-fetch placeholder)'),
+              _buildInfoField('Monthly Instalment Amount (auto-fetch placeholder)'),
+              _buildInfoField('Account Status (active / overdue)'),
+            ],
+          ),
+          _buildInfoSection(
+            '4. Payment Information',
+            [
+              _buildInfoField('Payment Amount (RM)'),
+              _buildInfoField('Payment Type (full settlement / monthly / extra payment)'),
+              _buildInfoField('Payment Method (FPX / card / e-wallet)'),
+            ],
+          ),
+          _buildInfoSection(
+            '5. Payment Reference Details',
+            [
+              _buildInfoPair('Payment Date', 'Reference Number (auto-generated placeholder)'),
+              _buildInfoField('Transaction ID'),
+            ],
+          ),
+          _buildInfoSection(
+            '6. Authentication / Verification',
+            [
+              _buildInfoField('Login Account'),
+              _buildInfoField('OTP / TAC Verification'),
+            ],
+          ),
+          _buildInfoSection(
+            '7. Confirmation & Receipt',
+            [
+              _buildInfoField('Payment Summary (before confirm)'),
+              _buildInfoField('Digital Receipt (after payment)'),
+              _buildInfoField('Send Receipt (download / email)'),
+            ],
+          ),
+          _buildInfoSection(
+            'Important Checks Before Payment',
+            [
+              _buildInfoField('IC / Loan Number verified'),
+              _buildInfoField('Payment amount verified'),
+              _buildInfoField('Payment type selected correctly'),
+            ],
+          ),
+          _buildInfoSection(
+            'MVP Quick Pay',
+            [
+              _buildInfoField('IC Number'),
+              _buildInfoField('Auto-fetched Loan Info (placeholder)'),
+              _buildInfoField('Enter Amount'),
+              _buildInfoField('Choose Payment Method'),
+              _buildInfoField('Confirm & Pay'),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLicenseRenewalForm() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFD9DEE5)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Licence Renewal',
+            style: TextStyle(
+              color: Color(0xFF1E2D3F),
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Upload your photo or use the existing JPJ photo, then complete the renewal details below.',
+            style: TextStyle(
+              color: Color(0xFF6F8094),
+              fontSize: 12,
+            ),
+          ),
+          const SizedBox(height: 14),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF5F8FC),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFDCE5F0)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE8F4FE),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(
+                        Icons.photo_camera_outlined,
+                        color: Color(0xFF3DA5F5),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Photo upload / existing photo',
+                            style: TextStyle(
+                              color: Color(0xFF1E2D3F),
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          SizedBox(height: 2),
+                          Text(
+                            'Passport-style photo or existing JPJ photo placeholder (UI only).',
+                            style: TextStyle(
+                              color: Color(0xFF607489),
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  height: 42,
+                  child: OutlinedButton.icon(
+                    onPressed: () {},
+                    icon: const Icon(Icons.file_upload_outlined),
+                    label: const Text('Upload Photo'),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  height: 42,
+                  child: OutlinedButton.icon(
+                    onPressed: () {},
+                    icon: const Icon(Icons.photo_library_outlined),
+                    label: const Text('Use Existing JPJ Photo'),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFDCE5F0)),
+                  ),
+                  child: const Text(
+                    'Accepted files: JPG, PNG, PDF for supporting documents. UI placeholder only.',
+                    style: TextStyle(
+                      color: Color(0xFF6F8094),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+          _buildInfoSection(
+            '1. Personal Identification (Core)',
+            [
+              _buildInfoField('Full Name'),
+              _buildInfoField('IC Number (MyKad) - Main Identifier'),
+              _buildInfoField('Date of Birth'),
+            ],
+          ),
+          _buildInfoSection(
+            '2. Licence Information',
+            [
+              _buildInfoField('Licence Number'),
+              _buildInfoPair('Licence Class (D, B2, etc.)', 'Expiry Date'),
+              _buildInfoField('Licence Status (active / expired / suspended)'),
+            ],
+          ),
+          _buildInfoSection(
+            '3. Contact Information',
+            [
+              _buildInfoPair('Phone Number', 'Email Address'),
+              _buildInfoField('Address'),
+            ],
+          ),
+          _buildInfoSection(
+            '4. Medical Declaration',
+            [
+              _buildInfoField('Health Condition Declaration'),
+              _buildInfoField('Vision / Medical Fitness'),
+            ],
+          ),
+          _buildInfoSection(
+            '5. Renewal Details & Payment',
+            [
+              _buildInfoField('Renewal Duration (1 year / 2 years / etc.)'),
+              _buildInfoField('Fee Amount (auto-calculated placeholder)'),
+              _buildInfoField('Payment Method (FPX / card / e-wallet)'),
+            ],
+          ),
+          _buildInfoSection(
+            '6. Delivery / Collection Method',
+            [
+              _buildInfoField('Self-Collect at Counter'),
+              _buildInfoField('Delivery Address (if posting licence)'),
+            ],
+          ),
+          _buildInfoSection(
+            '7. Verification & Security',
+            [
+              _buildInfoField('Login / Account'),
+              _buildInfoField('OTP / TAC Verification'),
+            ],
+          ),
+          _buildInfoSection(
+            '8. Confirmation',
+            [
+              _buildInfoField('Summary Before Payment'),
+              _buildInfoField('Receipt After Payment'),
+              _buildInfoField('Renewal Confirmation Status'),
+            ],
+          ),
+          _buildInfoSection(
+            'Important Checks',
+            [
+              _buildInfoField('Licence not blacklisted / suspended'),
+              _buildInfoField('No outstanding summons (if required)'),
+              _buildInfoField('Correct licence class selected'),
+            ],
+          ),
+          _buildInfoSection(
+            'MVP Quick Renewal',
+            [
+              _buildInfoField('IC Number'),
+              _buildInfoField('Auto-fetch licence info (placeholder)'),
+              _buildInfoField('Choose Renewal Duration'),
+              _buildInfoField('Pay / Done'),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSummonsPaymentForm() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFD9DEE5)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Summons Payment',
+            style: TextStyle(
+              color: Color(0xFF1E2D3F),
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Enter your identification details to auto-fetch summons records, then complete the payment UI below.',
+            style: TextStyle(
+              color: Color(0xFF6F8094),
+              fontSize: 12,
+            ),
+          ),
+          const SizedBox(height: 14),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF5F8FC),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFDCE5F0)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE8F4FE),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(
+                        Icons.upload_file_outlined,
+                        color: Color(0xFF3DA5F5),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Summons lookup document',
+                            style: TextStyle(
+                              color: Color(0xFF1E2D3F),
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          SizedBox(height: 2),
+                          Text(
+                            'Optional document upload placeholder for summons notice or related file.',
+                            style: TextStyle(
+                              color: Color(0xFF607489),
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  height: 42,
+                  child: OutlinedButton.icon(
+                    onPressed: () {},
+                    icon: const Icon(Icons.file_upload_outlined),
+                    label: const Text('Upload Summons Document'),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFDCE5F0)),
+                  ),
+                  child: const Text(
+                    'Accepted files: summons notice, notice image, or supporting PDF/image. UI only.',
+                    style: TextStyle(
+                      color: Color(0xFF6F8094),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+          _buildInfoSection(
+            '1. Identification (VERY IMPORTANT)',
+            [
+              _buildInfoField('IC Number (MyKad)'),
+              _buildInfoField('Vehicle Plate Number'),
+              _buildInfoField('Summons Number (best & most accurate)'),
+            ],
+          ),
+          _buildInfoSection(
+            '2. Summons Details (Auto-Fetched)',
+            [
+              _buildInfoField('Summons Number'),
+              _buildInfoField('Offence Type (speeding, parking, etc.)'),
+              _buildInfoPair('Date & Location of Offence', 'Issuing Authority (PDRM / JPJ / council)'),
+              _buildInfoPair('Amount to Pay', 'Status (unpaid / discounted / overdue)'),
+            ],
+          ),
+          _buildInfoSection(
+            '3. Contact Information',
+            [
+              _buildInfoPair('Phone Number', 'Email'),
+            ],
+          ),
+          _buildInfoSection(
+            '4. Payment Information',
+            [
+              _buildInfoField('Payment Amount (auto or editable)'),
+              _buildInfoField('Payment Type (single summons / multiple summons)'),
+              _buildInfoField('Payment Method (FPX / card / e-wallet)'),
+            ],
+          ),
+          _buildInfoSection(
+            '5. Transaction Details',
+            [
+              _buildInfoPair('Payment Date', 'Reference Number'),
+              _buildInfoField('Transaction ID'),
+            ],
+          ),
+          _buildInfoSection(
+            '6. Verification / Security',
+            [
+              _buildInfoField('Login (optional but recommended)'),
+              _buildInfoField('OTP / TAC Verification'),
+            ],
+          ),
+          _buildInfoSection(
+            '7. Confirmation & Receipt',
+            [
+              _buildInfoField('Payment Summary Before Confirm'),
+              _buildInfoField('Digital Receipt After Payment'),
+              _buildInfoField('Updated Status (paid)'),
+            ],
+          ),
+          _buildInfoSection(
+            'Important Checks',
+            [
+              _buildInfoField('Correct summons selected (if multiple)'),
+              _buildInfoField('Amount matches official record'),
+              _buildInfoField('Check discount campaigns / promotions'),
+            ],
+          ),
+          _buildInfoSection(
+            'MVP Quick Pay',
+            [
+              _buildInfoField('IC / Plate / Summons Number'),
+              _buildInfoField('Auto-fetch summons info (placeholder)'),
+              _buildInfoField('Enter Amount'),
+              _buildInfoField('Choose Payment Method'),
+              _buildInfoField('Confirm & Pay'),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDocumentChip(String label) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF7F8FA),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFD9DEE5)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 28,
+            height: 28,
+            decoration: BoxDecoration(
+              color: const Color(0xFFE8F4FE),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(
+              Icons.description_outlined,
+              color: Color(0xFF3DA5F5),
+              size: 16,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(
+                color: Color(0xFF1E2D3F),
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          const Icon(
+            Icons.check_circle_outline,
+            color: Color(0xFF7D8D9D),
+            size: 18,
           ),
         ],
       ),
