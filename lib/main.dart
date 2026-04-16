@@ -7,9 +7,35 @@ import 'payment.dart';
 import 'notification.dart';
 import 'profile.dart';
 import 'settings.dart';
+<<<<<<< Updated upstream
 
 void main() {
   runApp(const MyApp());
+=======
+import 'register.dart';
+import 'forgot_password.dart';
+import 'package:qr_flutter/qr_flutter.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:provider/provider.dart';
+import 'firebase_options.dart';
+import 'services/auth_service.dart';
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  final themeController = ThemeController();
+  await themeController.loadThemeFromFirestore();
+
+  runApp(
+    ChangeNotifierProvider(
+      create: (_) => ThemeController(),
+      child: const MyApp(),
+    ),
+  );
+>>>>>>> Stashed changes
 }
 
 class MyApp extends StatelessWidget {

@@ -1,5 +1,18 @@
 import 'package:flutter/material.dart';
 import 'chat_assistant_fab.dart';
+<<<<<<< Updated upstream
+=======
+import 'dart:async';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:file_picker/file_picker.dart';
+>>>>>>> Stashed changes
+
+import 'services/ai_service.dart';
+import 'services/prefill_service.dart';
+import 'services/service_navigation_intent.dart';
 
 class ServicePage extends StatelessWidget {
   const ServicePage({super.key});
@@ -180,6 +193,43 @@ class _ServicesBody extends StatelessWidget {
   const _ServicesBody();
 
   @override
+<<<<<<< Updated upstream
+=======
+  State<_ServicesBody> createState() => _ServicesBodyState();
+}
+
+class _ServicesBodyState extends State<_ServicesBody> {
+  String query = '';
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _openTargetServiceIfRequested();
+    });
+  }
+
+  void _openTargetServiceIfRequested() {
+    final targetTitle = ServiceNavigationIntent.targetServiceTitle;
+    if (targetTitle == null || targetTitle.isEmpty) {
+      return;
+    }
+
+    final allItems = [..._popularItems, ..._allItems];
+    final target = allItems.where((item) => item.title == targetTitle).toList();
+    ServiceNavigationIntent.targetServiceTitle = null;
+
+    if (target.isEmpty || !mounted) {
+      return;
+    }
+
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => _ServiceActionPage(item: target.first)),
+    );
+  }
+
+  @override
+>>>>>>> Stashed changes
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -394,9 +444,39 @@ class _ServiceActionPage extends StatefulWidget {
 
 class _ServiceActionPageState extends State<_ServiceActionPage> {
   final _formKey = GlobalKey<FormState>();
+  // Tax Filing Controllers
+  final _nameController = TextEditingController();
   final _tinController = TextEditingController();
   final _idController = TextEditingController();
+  final _addressController = TextEditingController();
+  final _dobController = TextEditingController();
   final _amountController = TextEditingController();
+  
+  // Shared controllers for other services
+  final _epfNameController = TextEditingController();
+  final _epfIdController = TextEditingController();
+  final _epfEmployerController = TextEditingController();
+  final _epfPhoneController = TextEditingController();
+  
+  final _healthNameController = TextEditingController();
+  final _healthIdController = TextEditingController();
+  final _healthPhoneController = TextEditingController();
+  final _healthDobController = TextEditingController();
+  
+  final _ptptnNameController = TextEditingController();
+  final _ptptnIdController = TextEditingController();
+  final _ptptnPhoneController = TextEditingController();
+  
+  final _licenseNameController = TextEditingController();
+  final _licenseIdController = TextEditingController();
+  final _licenseDobController = TextEditingController();
+  
+  final _summonsNameController = TextEditingController();
+  final _summonsIdController = TextEditingController();
+  final _summonsPhoneController = TextEditingController();
+  
+  AiOcrResult? _latestOcrResult;
+  String? _aiNote;
   String _taxType = 'Income Tax (Cukai Pendapatan)';
   String _assessmentYear = '${DateTime.now().year}';
   String _paymentCode = '084';
@@ -410,12 +490,328 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
 
   @override
   void dispose() {
+    // Tax controllers
+    _nameController.dispose();
     _tinController.dispose();
     _idController.dispose();
+    _addressController.dispose();
+    _dobController.dispose();
     _amountController.dispose();
+    
+    // EPF controllers
+    _epfNameController.dispose();
+    _epfIdController.dispose();
+    _epfEmployerController.dispose();
+    _epfPhoneController.dispose();
+    
+    // Health controllers
+    _healthNameController.dispose();
+    _healthIdController.dispose();
+    _healthPhoneController.dispose();
+    _healthDobController.dispose();
+    
+    // PTPTN controllers
+    _ptptnNameController.dispose();
+    _ptptnIdController.dispose();
+    _ptptnPhoneController.dispose();
+    
+    // License controllers
+    _licenseNameController.dispose();
+    _licenseIdController.dispose();
+    _licenseDobController.dispose();
+    
+    // Summons controllers
+    _summonsNameController.dispose();
+    _summonsIdController.dispose();
+    _summonsPhoneController.dispose();
+    
     super.dispose();
   }
 
+<<<<<<< Updated upstream
+=======
+  Future<void> fillWithAI() async {
+    setState(() => isLoading = true);
+
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        throw Exception('Please sign in first.');
+      }
+
+      final profileDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+      final profile = profileDoc.data() ?? const {};
+
+      final documentSnapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('documents')
+          .get();
+
+      final documents = documentSnapshot.docs.map((doc) => doc.data()).toList();
+      final prefill = PrefillService.buildPrefill(profile: profile, documents: documents);
+      final ocrResult = AiDraftStore.instance.lastOcrResult;
+
+      _latestOcrResult = ocrResult;
+
+      setState(() {
+        _aiNote = ocrResult == null
+            ? 'No OCR result yet. Upload a document first.'
+            : 'OCR data loaded for ${widget.item.title}.';
+
+        final name = ocrResult?.fullName ?? (prefill['name'] ?? profile['name'] ?? '').toString();
+        final ic = ocrResult?.icNumber ?? (prefill['ic'] ?? profile['ic'] ?? '').toString();
+        final address = ocrResult?.address ?? (profile['address'] ?? '').toString();
+        final dob = ocrResult?.dob ?? (profile['dob'] ?? '').toString();
+        final phone = ocrResult?.phone ?? (profile['phone'] ?? '').toString();
+        final income = _formatAmount(ocrResult?.income ?? prefill['income'] ?? profile['income']);
+
+        if (_isTaxFiling) {
+          _nameController.text = name;
+          _tinController.text = (profile['tin'] ?? profile['tax_id'] ?? '').toString();
+          _idController.text = ic;
+          _addressController.text = address;
+          _dobController.text = dob;
+          _amountController.text = income;
+
+          final estimatedTax = profile['estimatedTax']?.toString();
+          if (_amountController.text.isEmpty && estimatedTax != null && estimatedTax.isNotEmpty) {
+            _amountController.text = estimatedTax;
+          }
+        } else if (_isEpfManagement) {
+          _epfNameController.text = name;
+          _epfIdController.text = ic;
+          _epfPhoneController.text = phone;
+          _epfEmployerController.text = ocrResult?.phone ?? profile['employer_name'] ?? '';
+        } else if (_isHealthService) {
+          _healthNameController.text = name;
+          _healthIdController.text = ic;
+          _healthPhoneController.text = phone;
+          _healthDobController.text = dob;
+        } else if (_isLoanPayment) {
+          _ptptnNameController.text = name;
+          _ptptnIdController.text = ic;
+          _ptptnPhoneController.text = phone;
+        } else if (_isLicenseRenewal) {
+          _licenseNameController.text = name;
+          _licenseIdController.text = ic;
+          _licenseDobController.text = dob;
+        } else if (_isSummonsPayment) {
+          _summonsNameController.text = name;
+          _summonsIdController.text = ic;
+          _summonsPhoneController.text = phone;
+        }
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            ocrResult == null
+                ? 'Profile details loaded for ${widget.item.title}.'
+                : 'OCR data applied to ${widget.item.title}.',
+          ),
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('AI fill failed: $e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => isLoading = false);
+      }
+    }
+  }
+
+  Future<void> uploadDocument(String type) async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'],
+        withData: true,
+      );
+
+      if (result == null || result.files.first.bytes == null) {
+        return;
+      }
+
+      final file = result.files.first;
+      setState(() => isLoading = true);
+
+      final extracted = await AiService.instance.extractDocument(
+        bytes: file.bytes!,
+        mimeType: _mimeTypeForExtension(file.extension),
+      );
+      AiDraftStore.instance.lastOcrResult = extracted;
+      _latestOcrResult = extracted;
+      _aiNote = 'OCR extracted from ${file.name}.';
+
+      if (_isTaxFiling) {
+        setState(() {
+          _nameController.text = extracted.fullName ?? _nameController.text;
+          _idController.text = extracted.icNumber ?? _idController.text;
+          _addressController.text = extracted.address ?? _addressController.text;
+          _dobController.text = extracted.dob ?? _dobController.text;
+          _amountController.text = _formatAmount(extracted.income);
+        });
+      } else if (_isEpfManagement) {
+        setState(() {
+          _epfNameController.text = extracted.fullName ?? _epfNameController.text;
+          _epfIdController.text = extracted.icNumber ?? _epfIdController.text;
+          _epfPhoneController.text = extracted.phone ?? _epfPhoneController.text;
+        });
+      } else if (_isHealthService) {
+        setState(() {
+          _healthNameController.text = extracted.fullName ?? _healthNameController.text;
+          _healthIdController.text = extracted.icNumber ?? _healthIdController.text;
+          _healthPhoneController.text = extracted.phone ?? _healthPhoneController.text;
+          _healthDobController.text = extracted.dob ?? _healthDobController.text;
+        });
+      } else if (_isLoanPayment) {
+        setState(() {
+          _ptptnNameController.text = extracted.fullName ?? _ptptnNameController.text;
+          _ptptnIdController.text = extracted.icNumber ?? _ptptnIdController.text;
+          _ptptnPhoneController.text = extracted.phone ?? _ptptnPhoneController.text;
+        });
+      } else if (_isLicenseRenewal) {
+        setState(() {
+          _licenseNameController.text = extracted.fullName ?? _licenseNameController.text;
+          _licenseIdController.text = extracted.icNumber ?? _licenseIdController.text;
+          _licenseDobController.text = extracted.dob ?? _licenseDobController.text;
+        });
+      } else if (_isSummonsPayment) {
+        setState(() {
+          _summonsNameController.text = extracted.fullName ?? _summonsNameController.text;
+          _summonsIdController.text = extracted.icNumber ?? _summonsIdController.text;
+          _summonsPhoneController.text = extracted.phone ?? _summonsPhoneController.text;
+        });
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            _isTaxFiling
+                ? 'OCR extracted and applied to the tax form.'
+                : 'Document extracted successfully for ${widget.item.title}.',
+          ),
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('OCR upload failed: $e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => isLoading = false);
+      }
+    }
+}
+
+  String _mimeTypeForExtension(String? extension) {
+    switch (extension?.toLowerCase()) {
+      case 'jpg':
+      case 'jpeg':
+        return 'image/jpeg';
+      case 'png':
+        return 'image/png';
+      case 'pdf':
+        return 'application/pdf';
+      default:
+        return 'application/octet-stream';
+    }
+  }
+
+  String _formatAmount(dynamic value) {
+    if (value == null) {
+      return '';
+    }
+
+    if (value is num) {
+      return value.toStringAsFixed(0);
+    }
+
+    final text = value.toString().replaceAll(RegExp(r'[^0-9.]'), '');
+    if (text.isEmpty) {
+      return '';
+    }
+
+    final amount = double.tryParse(text);
+    return amount == null ? text : amount.toStringAsFixed(0);
+  }
+
+  Widget _buildAiOcrSummaryCard() {
+    final result = _latestOcrResult;
+    final note = _aiNote;
+
+    if (result == null && (note == null || note.isEmpty)) {
+      return const SizedBox.shrink();
+    }
+
+    final extractedEntries = result?.extracted.entries.where((entry) {
+      final value = entry.value?.toString().trim();
+      return value != null && value.isNotEmpty && value.toLowerCase() != 'null';
+    }).toList();
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(top: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEFF8F2),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFD7EBDD)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'AI document summary',
+            style: TextStyle(
+              color: Color(0xFF1E2D3F),
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          if (note != null && note.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              note,
+              style: const TextStyle(
+                color: Color(0xFF607489),
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+          if (result != null) ...[
+            const SizedBox(height: 8),
+            if (extractedEntries == null || extractedEntries.isEmpty)
+              const Text('No extracted fields found from the latest upload.')
+            else
+              ...extractedEntries.map(
+                (entry) => Padding(
+                  padding: const EdgeInsets.only(bottom: 2),
+                  child: Text(
+                    '${_formatExtractedLabel(entry.key)}: ${entry.value}',
+                  ),
+                ),
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  String _formatExtractedLabel(String key) {
+    return key
+        .replaceAll('_', ' ')
+        .split(' ')
+        .where((part) => part.isNotEmpty)
+        .map((part) => '${part[0].toUpperCase()}${part.substring(1)}')
+        .join(' ');
+  }
+
+>>>>>>> Stashed changes
   void _submitTaxPayment() {
     if (!(_formKey.currentState?.validate() ?? false)) {
       return;
@@ -602,7 +998,7 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'EPF Document Upload',
+            'EPF (KWSP) Management',
             style: TextStyle(
               color: Color(0xFF1E2D3F),
               fontSize: 16,
@@ -611,11 +1007,16 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
           ),
           const SizedBox(height: 8),
           const Text(
+<<<<<<< Updated upstream
             'Upload your supporting documents before continuing with EPF services.',
             style: TextStyle(
               color: Color(0xFF6F8094),
               fontSize: 12,
             ),
+=======
+            'Upload your EPF documents and auto-fill your details.',
+            style: TextStyle(color: Color(0xFF6F8094), fontSize: 12),
+>>>>>>> Stashed changes
           ),
           const SizedBox(height: 14),
           Container(
@@ -679,6 +1080,22 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
                     label: const Text('Choose File'),
                   ),
                 ),
+<<<<<<< Updated upstream
+=======
+
+                const SizedBox(height: 8),
+
+                SizedBox(
+                  width: double.infinity,
+                  height: 42,
+                  child: FilledButton.icon(
+                    onPressed: fillWithAI,
+                    icon: const Icon(Icons.auto_awesome),
+                    label: const Text('Auto Fill with AI'),
+                  ),
+                ),
+
+>>>>>>> Stashed changes
                 const SizedBox(height: 10),
                 Container(
                   width: double.infinity,
@@ -700,25 +1117,44 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
                     ),
                   ),
                 ),
+                _buildAiOcrSummaryCard(),
               ],
             ),
           ),
           const SizedBox(height: 14),
+          
+          // ===== FORM FIELDS USING CONTROLLERS =====
           const Text(
-            'Suggested documents',
-            style: TextStyle(
-              color: Color(0xFF1E2D3F),
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
+            '1. Member Information',
+            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+          ),
+          const SizedBox(height: 8),
+          TextFormField(
+            controller: _epfNameController,
+            decoration: const InputDecoration(
+              labelText: 'Full Name',
+              border: OutlineInputBorder(),
             ),
           ),
           const SizedBox(height: 10),
-          _buildDocumentChip('MyKad / Passport copy'),
-          _buildDocumentChip('Employment confirmation letter'),
-          _buildDocumentChip('Latest salary slip'),
-          _buildDocumentChip('EPF account statement'),
-          _buildDocumentChip('Supporting withdrawal or contribution document'),
+          TextFormField(
+            controller: _epfIdController,
+            decoration: const InputDecoration(
+              labelText: 'IC Number (MyKad)',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 10),
+          TextFormField(
+            controller: _epfPhoneController,
+            decoration: const InputDecoration(
+              labelText: 'Phone Number',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          
           const SizedBox(height: 14),
+<<<<<<< Updated upstream
           _buildInfoSection(
             '1. Member (User) Information',
             [
@@ -795,6 +1231,81 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
               _buildInfoField('Total Savings Overview'),
               _buildInfoField('Retirement Savings Simulation'),
             ],
+=======
+          const Text(
+            '2. Employment Details',
+            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+          ),
+          const SizedBox(height: 8),
+          TextFormField(
+            controller: _epfEmployerController,
+            decoration: const InputDecoration(
+              labelText: 'Employer Name',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 10),
+          TextFormField(
+            decoration: const InputDecoration(
+              labelText: 'Employment Start Date',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 10),
+          TextFormField(
+            decoration: const InputDecoration(
+              labelText: 'Monthly Salary (RM)',
+              border: OutlineInputBorder(),
+              hintText: '0.00',
+            ),
+          ),
+          
+          const SizedBox(height: 14),
+          const Text(
+            '3. Account Information',
+            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+          ),
+          const SizedBox(height: 8),
+          TextFormField(
+            decoration: const InputDecoration(
+              labelText: 'Account 1 Balance (RM) - Savings',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 10),
+          TextFormField(
+            decoration: const InputDecoration(
+              labelText: 'Account 2 Balance (RM) - Investment',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 10),
+          TextFormField(
+            decoration: const InputDecoration(
+              labelText: 'Total Accumulated Balance (RM)',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          
+          const SizedBox(height: 14),
+          const Text(
+            '4. Contribution & Withdrawals',
+            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+          ),
+          const SizedBox(height: 8),
+          DropdownButtonFormField<String>(
+            decoration: const InputDecoration(
+              labelText: 'Withdrawal Type',
+              border: OutlineInputBorder(),
+            ),
+            items: const [
+              DropdownMenuItem(value: 'retirement', child: Text('Retirement (Age 55+)')),
+              DropdownMenuItem(value: 'housing', child: Text('Housing Loan')),
+              DropdownMenuItem(value: 'medical', child: Text('Medical/Education')),
+              DropdownMenuItem(value: 'none', child: Text('No Withdrawal')),
+            ],
+            onChanged: (value) {},
+>>>>>>> Stashed changes
           ),
         ],
       ),
@@ -877,11 +1388,16 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
           ),
           const SizedBox(height: 8),
           const Text(
+<<<<<<< Updated upstream
             'Upload supporting documents, then fill in the required health registration details manually.',
             style: TextStyle(
               color: Color(0xFF6F8094),
               fontSize: 12,
             ),
+=======
+            'Upload supporting documents and auto-fill your health registration details.',
+            style: TextStyle(color: Color(0xFF6F8094), fontSize: 12),
+>>>>>>> Stashed changes
           ),
           const SizedBox(height: 14),
           Container(
@@ -924,7 +1440,7 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
                           ),
                           SizedBox(height: 2),
                           Text(
-                            'Medical card, referral letter, or previous reports (UI placeholder only).',
+                            'Medical card, referral letter, or previous reports.',
                             style: TextStyle(
                               color: Color(0xFF607489),
                               fontSize: 12,
@@ -936,6 +1452,10 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
                   ],
                 ),
                 const SizedBox(height: 12),
+<<<<<<< Updated upstream
+=======
+
+>>>>>>> Stashed changes
                 SizedBox(
                   width: double.infinity,
                   height: 42,
@@ -945,6 +1465,22 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
                     label: const Text('Choose Document'),
                   ),
                 ),
+<<<<<<< Updated upstream
+=======
+
+                const SizedBox(height: 8),
+
+                SizedBox(
+                  width: double.infinity,
+                  height: 42,
+                  child: FilledButton.icon(
+                    onPressed: fillWithAI,
+                    icon: const Icon(Icons.auto_awesome),
+                    label: const Text('Auto Fill with AI'),
+                  ),
+                ),
+
+>>>>>>> Stashed changes
                 const SizedBox(height: 10),
                 Container(
                   width: double.infinity,
@@ -963,10 +1499,12 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
                     ),
                   ),
                 ),
+                _buildAiOcrSummaryCard(),
               ],
             ),
           ),
           const SizedBox(height: 14),
+<<<<<<< Updated upstream
           _buildInfoSection(
             '1. Personal Information (Basic Identity)',
             [
@@ -1045,6 +1583,118 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
               _buildInfoField('Appointment Booking Notes'),
               _buildInfoField('Emergency Contact (Name + Phone)'),
             ],
+=======
+          
+          // ===== FORM FIELDS USING CONTROLLERS =====
+          const Text(
+            '1. Personal Information',
+            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+          ),
+          const SizedBox(height: 8),
+          TextFormField(
+            controller: _healthNameController,
+            decoration: const InputDecoration(
+              labelText: 'Full Name',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 10),
+          TextFormField(
+            controller: _healthIdController,
+            decoration: const InputDecoration(
+              labelText: 'IC Number / Passport',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 10),
+          TextFormField(
+            controller: _healthDobController,
+            decoration: const InputDecoration(
+              labelText: 'Date of Birth',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          
+          const SizedBox(height: 14),
+          const Text(
+            '2. Contact Information',
+            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+          ),
+          const SizedBox(height: 8),
+          TextFormField(
+            controller: _healthPhoneController,
+            decoration: const InputDecoration(
+              labelText: 'Phone Number',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 10),
+          TextFormField(
+            decoration: const InputDecoration(
+              labelText: 'Email Address',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          
+          const SizedBox(height: 14),
+          const Text(
+            '3. Health Profile',
+            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+          ),
+          const SizedBox(height: 8),
+          DropdownButtonFormField<String>(
+            decoration: const InputDecoration(
+              labelText: 'Blood Type',
+              border: OutlineInputBorder(),
+            ),
+            items: const [
+              DropdownMenuItem(value: 'O+', child: Text('O+')),
+              DropdownMenuItem(value: 'O-', child: Text('O-')),
+              DropdownMenuItem(value: 'A+', child: Text('A+')),
+              DropdownMenuItem(value: 'A-', child: Text('A-')),
+              DropdownMenuItem(value: 'B+', child: Text('B+')),
+              DropdownMenuItem(value: 'B-', child: Text('B-')),
+              DropdownMenuItem(value: 'AB+', child: Text('AB+')),
+              DropdownMenuItem(value: 'AB-', child: Text('AB-')),
+              DropdownMenuItem(value: 'Unknown', child: Text('Unknown')),
+            ],
+            onChanged: (value) {},
+          ),
+          const SizedBox(height: 10),
+          TextFormField(
+            decoration: const InputDecoration(
+              labelText: 'Allergies (medication, food, etc.)',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 10),
+          TextFormField(
+            decoration: const InputDecoration(
+              labelText: 'Existing Medical Conditions',
+              border: OutlineInputBorder(),
+              hintText: 'e.g. diabetes, asthma, hypertension',
+            ),
+          ),
+          
+          const SizedBox(height: 14),
+          const Text(
+            '4. Emergency Contact',
+            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+          ),
+          const SizedBox(height: 8),
+          TextFormField(
+            decoration: const InputDecoration(
+              labelText: 'Emergency Contact Name',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 10),
+          TextFormField(
+            decoration: const InputDecoration(
+              labelText: 'Emergency Contact Phone',
+              border: OutlineInputBorder(),
+            ),
+>>>>>>> Stashed changes
           ),
         ],
       ),
@@ -1073,11 +1723,16 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
           ),
           const SizedBox(height: 8),
           const Text(
+<<<<<<< Updated upstream
             'Upload supporting documents and fill in payment details manually.',
             style: TextStyle(
               color: Color(0xFF6F8094),
               fontSize: 12,
             ),
+=======
+            'Upload supporting documents and fill in payment details. Auto Fill will extract from your documents.',
+            style: TextStyle(color: Color(0xFF6F8094), fontSize: 12),
+>>>>>>> Stashed changes
           ),
           const SizedBox(height: 14),
           Container(
@@ -1141,6 +1796,22 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
                     label: const Text('Choose Document'),
                   ),
                 ),
+<<<<<<< Updated upstream
+=======
+
+                const SizedBox(height: 8),
+
+                SizedBox(
+                  width: double.infinity,
+                  height: 42,
+                  child: FilledButton.icon(
+                    onPressed: fillWithAI,
+                    icon: const Icon(Icons.auto_awesome),
+                    label: const Text('Auto Fill with AI'),
+                  ),
+                ),
+
+>>>>>>> Stashed changes
                 const SizedBox(height: 10),
                 Container(
                   width: double.infinity,
@@ -1151,7 +1822,7 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
                     border: Border.all(color: const Color(0xFFDCE5F0)),
                   ),
                   child: const Text(
-                    'Accepted files: PDF, JPG, PNG. UI only (no backend upload).',
+                    'Upload: PDF, JPG, PNG documents. Auto Fill will extract borrower details automatically.',
                     style: TextStyle(
                       color: Color(0xFF6F8094),
                       fontSize: 12,
@@ -1159,10 +1830,12 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
                     ),
                   ),
                 ),
+                _buildAiOcrSummaryCard(),
               ],
             ),
           ),
           const SizedBox(height: 14),
+<<<<<<< Updated upstream
           _buildInfoSection(
             '1. Borrower Identification (VERY IMPORTANT)',
             [
@@ -1232,6 +1905,90 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
               _buildInfoField('Choose Payment Method'),
               _buildInfoField('Confirm & Pay'),
             ],
+=======
+          
+          // ===== FORM FIELDS USING CONTROLLERS =====
+          const Text(
+            '1. Borrower Identification',
+            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+          ),
+          const SizedBox(height: 8),
+          TextFormField(
+            controller: _ptptnNameController,
+            decoration: const InputDecoration(
+              labelText: 'Full Name',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 10),
+          TextFormField(
+            controller: _ptptnIdController,
+            decoration: const InputDecoration(
+              labelText: 'IC Number (MyKad)',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 10),
+          TextFormField(
+            decoration: const InputDecoration(
+              labelText: 'PTPTN Loan Number (optional)',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          
+          const SizedBox(height: 14),
+          const Text(
+            '2. Contact Information',
+            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+          ),
+          const SizedBox(height: 8),
+          TextFormField(
+            controller: _ptptnPhoneController,
+            decoration: const InputDecoration(
+              labelText: 'Phone Number',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 10),
+          TextFormField(
+            decoration: const InputDecoration(
+              labelText: 'Email Address',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          
+          const SizedBox(height: 14),
+          const Text(
+            '3. Payment Information',
+            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+          ),
+          const SizedBox(height: 8),
+          TextFormField(
+            decoration: const InputDecoration(
+              labelText: 'Outstanding Balance (RM)',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 10),
+          TextFormField(
+            decoration: const InputDecoration(
+              labelText: 'Payment Amount (RM)',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 10),
+          DropdownButtonFormField<String>(
+            decoration: const InputDecoration(
+              labelText: 'Payment Type',
+              border: OutlineInputBorder(),
+            ),
+            items: const [
+              DropdownMenuItem(value: 'monthly', child: Text('Monthly Instalment')),
+              DropdownMenuItem(value: 'full', child: Text('Full Settlement')),
+              DropdownMenuItem(value: 'extra', child: Text('Extra Payment')),
+            ],
+            onChanged: (value) {},
+>>>>>>> Stashed changes
           ),
         ],
       ),
@@ -1251,7 +2008,7 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Licence Renewal',
+            'Licence Renewal (JPJ)',
             style: TextStyle(
               color: Color(0xFF1E2D3F),
               fontSize: 16,
@@ -1260,11 +2017,16 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
           ),
           const SizedBox(height: 8),
           const Text(
+<<<<<<< Updated upstream
             'Upload your photo or use the existing JPJ photo, then complete the renewal details below.',
             style: TextStyle(
               color: Color(0xFF6F8094),
               fontSize: 12,
             ),
+=======
+            'Upload your identification and auto-fill your renewal details.',
+            style: TextStyle(color: Color(0xFF6F8094), fontSize: 12),
+>>>>>>> Stashed changes
           ),
           const SizedBox(height: 14),
           Container(
@@ -1288,7 +2050,7 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: const Icon(
-                        Icons.photo_camera_outlined,
+                        Icons.upload_file_outlined,
                         color: Color(0xFF3DA5F5),
                       ),
                     ),
@@ -1298,7 +2060,7 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Photo upload / existing photo',
+                            'Upload document',
                             style: TextStyle(
                               color: Color(0xFF1E2D3F),
                               fontSize: 14,
@@ -1307,7 +2069,7 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
                           ),
                           SizedBox(height: 2),
                           Text(
-                            'Passport-style photo or existing JPJ photo placeholder (UI only).',
+                            'Current license, IC, or supporting documents.',
                             style: TextStyle(
                               color: Color(0xFF607489),
                               fontSize: 12,
@@ -1319,16 +2081,21 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
                   ],
                 ),
                 const SizedBox(height: 12),
+<<<<<<< Updated upstream
+=======
+
+>>>>>>> Stashed changes
                 SizedBox(
                   width: double.infinity,
                   height: 42,
                   child: OutlinedButton.icon(
                     onPressed: () {},
                     icon: const Icon(Icons.file_upload_outlined),
-                    label: const Text('Upload Photo'),
+                    label: const Text('Upload Document'),
                   ),
                 ),
                 const SizedBox(height: 8),
+<<<<<<< Updated upstream
                 SizedBox(
                   width: double.infinity,
                   height: 42,
@@ -1338,6 +2105,19 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
                     label: const Text('Use Existing JPJ Photo'),
                   ),
                 ),
+=======
+
+                SizedBox(
+                  width: double.infinity,
+                  height: 42,
+                  child: FilledButton.icon(
+                    onPressed: fillWithAI,
+                    icon: const Icon(Icons.auto_awesome),
+                    label: const Text('Auto Fill with AI'),
+                  ),
+                ),
+
+>>>>>>> Stashed changes
                 const SizedBox(height: 10),
                 Container(
                   width: double.infinity,
@@ -1348,7 +2128,7 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
                     border: Border.all(color: const Color(0xFFDCE5F0)),
                   ),
                   child: const Text(
-                    'Accepted files: JPG, PNG, PDF for supporting documents. UI placeholder only.',
+                    'Accepted files: PDF, JPG, PNG (current license, IC, medical form if required).',
                     style: TextStyle(
                       color: Color(0xFF6F8094),
                       fontSize: 12,
@@ -1356,10 +2136,12 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
                     ),
                   ),
                 ),
+                _buildAiOcrSummaryCard(),
               ],
             ),
           ),
           const SizedBox(height: 14),
+<<<<<<< Updated upstream
           _buildInfoSection(
             '1. Personal Identification (Core)',
             [
@@ -1437,6 +2219,118 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
               _buildInfoField('Pay / Done'),
             ],
           ),
+=======
+          
+          // ===== FORM FIELDS USING CONTROLLERS =====
+          const Text(
+            '1. Personal Identification',
+            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+          ),
+          const SizedBox(height: 8),
+          TextFormField(
+            controller: _licenseNameController,
+            decoration: const InputDecoration(
+              labelText: 'Full Name',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 10),
+          TextFormField(
+            controller: _licenseIdController,
+            decoration: const InputDecoration(
+              labelText: 'IC Number (MyKad)',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 10),
+          TextFormField(
+            controller: _licenseDobController,
+            decoration: const InputDecoration(
+              labelText: 'Date of Birth',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          
+          const SizedBox(height: 14),
+          const Text(
+            '2. Licence Information',
+            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+          ),
+          const SizedBox(height: 8),
+          TextFormField(
+            decoration: const InputDecoration(
+              labelText: 'Licence Number',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 10),
+          DropdownButtonFormField<String>(
+            decoration: const InputDecoration(
+              labelText: 'Licence Class',
+              border: OutlineInputBorder(),
+            ),
+            items: const [
+              DropdownMenuItem(value: 'D', child: Text('Class D - Car')),
+              DropdownMenuItem(value: 'E', child: Text('Class E - Motorcycle')),
+              DropdownMenuItem(value: 'B2', child: Text('Class B2 - Heavy Vehicle')),
+            ],
+            onChanged: (value) {},
+          ),
+          const SizedBox(height: 10),
+          TextFormField(
+            decoration: const InputDecoration(
+              labelText: 'Current Expiry Date',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          
+          const SizedBox(height: 14),
+          const Text(
+            '3. Renewal Details',
+            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+          ),
+          const SizedBox(height: 8),
+          DropdownButtonFormField<String>(
+            decoration: const InputDecoration(
+              labelText: 'Renewal Duration',
+              border: OutlineInputBorder(),
+            ),
+            items: const [
+              DropdownMenuItem(value: '1', child: Text('1 Year')),
+              DropdownMenuItem(value: '2', child: Text('2 Years')),
+              DropdownMenuItem(value: '5', child: Text('5 Years')),
+            ],
+            onChanged: (value) {},
+          ),
+          const SizedBox(height: 10),
+          TextFormField(
+            decoration: const InputDecoration(
+              labelText: 'Renewal Fee (RM)',
+              border: OutlineInputBorder(),
+              hintText: 'RM 60-90',
+            ),
+          ),
+          _buildInfoSection('7. Verification & Security', [
+            _buildInfoField('Login / Account'),
+            _buildInfoField('OTP / TAC Verification'),
+          ]),
+          _buildInfoSection('8. Confirmation', [
+            _buildInfoField('Summary Before Payment'),
+            _buildInfoField('Receipt After Payment'),
+            _buildInfoField('Renewal Confirmation Status'),
+          ]),
+          _buildInfoSection('Important Checks', [
+            _buildInfoField('Licence not blacklisted / suspended'),
+            _buildInfoField('No outstanding summons (if required)'),
+            _buildInfoField('Correct licence class selected'),
+          ]),
+          _buildInfoSection('MVP Quick Renewal', [
+            _buildInfoField('IC Number'),
+            _buildInfoField('Auto-fetch licence info (placeholder)'),
+            _buildInfoField('Choose Renewal Duration'),
+            _buildInfoField('Pay / Done'),
+          ]),
+>>>>>>> Stashed changes
         ],
       ),
     );
@@ -1550,6 +2444,7 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
                     ),
                   ),
                 ),
+<<<<<<< Updated upstream
               ],
             ),
           ),
@@ -1629,6 +2524,159 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
       ),
     );
   }
+=======
+              ),
+
+              const SizedBox(height: 8),
+
+              // AI autofill button
+              SizedBox(
+                width: double.infinity,
+                height: 42,
+                child: FilledButton.icon(
+                  onPressed: fillWithAI,
+                  icon: const Icon(Icons.auto_awesome),
+                  label: const Text('Auto Fill with AI'),
+                ),
+              ),
+
+              const SizedBox(height: 10),
+
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFDCE5F0)),
+                ),
+                child: const Text(
+                  'Accepted files: summons notice, notice image, or supporting PDF/image.',
+                  style: TextStyle(
+                    color: Color(0xFF6F8094),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+                _buildAiOcrSummaryCard(),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 14),
+
+        // ===== FORM FIELDS USING CONTROLLERS =====
+        const Text(
+          '1. Identification',
+          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+        ),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: _summonsIdController,
+          decoration: const InputDecoration(
+            labelText: 'IC Number (MyKad)',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        const SizedBox(height: 10),
+        TextFormField(
+          decoration: const InputDecoration(
+            labelText: 'Vehicle Plate Number',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        const SizedBox(height: 10),
+        TextFormField(
+          decoration: const InputDecoration(
+            labelText: 'Summons Number',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        
+        const SizedBox(height: 14),
+        const Text(
+          '2. Summons Details',
+          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+        ),
+        const SizedBox(height: 8),
+        TextFormField(
+          decoration: const InputDecoration(
+            labelText: 'Offence Type',
+            border: OutlineInputBorder(),
+            hintText: 'e.g. speeding, parking, expired road tax',
+          ),
+        ),
+        const SizedBox(height: 10),
+        TextFormField(
+          decoration: const InputDecoration(
+            labelText: 'Date of Offence',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        const SizedBox(height: 10),
+        TextFormField(
+          decoration: const InputDecoration(
+            labelText: 'Fine Amount (RM)',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        
+        const SizedBox(height: 14),
+        const Text(
+          '3. Contact Information',
+          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+        ),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: _summonsPhoneController,
+          decoration: const InputDecoration(
+            labelText: 'Phone Number',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        const SizedBox(height: 10),
+        TextFormField(
+          decoration: const InputDecoration(
+            labelText: 'Email Address',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        
+        const SizedBox(height: 14),
+        const Text(
+          '4. Payment Information',
+          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+        ),
+        const SizedBox(height: 8),
+        TextFormField(
+          decoration: const InputDecoration(
+            labelText: 'Payment Amount (RM)',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        const SizedBox(height: 10),
+        DropdownButtonFormField<String>(
+          decoration: const InputDecoration(
+            labelText: 'Payment Method',
+            border: OutlineInputBorder(),
+          ),
+          items: const [
+            DropdownMenuItem(value: 'fpx', child: Text('FPX Online')),
+            DropdownMenuItem(value: 'card', child: Text('Credit/Debit Card')),
+            DropdownMenuItem(value: 'ewallet', child: Text('E-Wallet')),
+            DropdownMenuItem(value: 'counter', child: Text('Counter Payment')),
+          ],
+          onChanged: (value) {},
+        ),
+      ],
+    ),
+  );
+}
+>>>>>>> Stashed changes
 
   Widget _buildDocumentChip(String label) {
     return Container(
@@ -1789,6 +2837,72 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
                       ],
                     ),
                   ),
+<<<<<<< Updated upstream
+=======
+
+                  const SizedBox(height: 8),
+
+                  // ===== AUTO FILL BUTTON =====
+                  SizedBox(
+                    width: double.infinity,
+                    height: 42,
+                    child: FilledButton.icon(
+                      onPressed: fillWithAI, // 👈 backend API
+                      icon: const Icon(Icons.auto_awesome),
+                      label: const Text("Auto Fill with AI"),
+                    ),
+                  ),
+
+                  const SizedBox(height: 10),
+
+                  // ===== INFO TEXT =====
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFFDCE5F0)),
+                    ),
+                    child: const Text(
+                      'Upload: PDF, image, or document\nAuto Fill: uses AI to prefill tax form fields',
+                      style: TextStyle(
+                        color: Color(0xFF6F8094),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+
+                  _buildAiOcrSummaryCard(),
+                ],
+              ),
+            ),
+>>>>>>> Stashed changes
+            const SizedBox(height: 12),
+            const Text(
+              '0. Applicant Name',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'This is extracted from your IC or profile when available.',
+              style: TextStyle(color: Color(0xFF6F8094), fontSize: 12),
+            ),
+            const SizedBox(height: 8),
+            TextFormField(
+              controller: _nameController,
+              decoration: const InputDecoration(
+                labelText: 'Full Name',
+                border: OutlineInputBorder(),
+              ),
+              validator: (value) => (value == null || value.trim().isEmpty)
+                  ? 'Name is required'
+                  : null,
+            ),
             const SizedBox(height: 12),
             const Text(
               '1. Tax Identification Number (TIN)',
@@ -1829,6 +2943,33 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
               validator: (value) => (value == null || value.trim().isEmpty)
                   ? 'Identification number is required'
                   : null,
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              '2a. Applicant Address',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 8),
+            TextFormField(
+              controller: _addressController,
+              maxLines: 2,
+              decoration: const InputDecoration(
+                labelText: 'Address',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              '2b. Date of Birth',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 8),
+            TextFormField(
+              controller: _dobController,
+              decoration: const InputDecoration(
+                labelText: 'Date of Birth',
+                border: OutlineInputBorder(),
+              ),
             ),
             const SizedBox(height: 12),
             const Text(
