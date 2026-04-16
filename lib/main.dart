@@ -7,9 +7,36 @@ import 'payment.dart';
 import 'notification.dart';
 import 'profile.dart';
 import 'settings.dart';
+import 'register.dart';
+import 'forgot_password.dart';
+import 'package:qr_flutter/qr_flutter.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:provider/provider.dart';
+import 'firebase_options.dart';
+import 'services/auth_service.dart';
+import 'services/tax.dart';
+import 'services/epf.dart';
+import 'services/ptptn.dart';
+import 'services/jpj.dart';
+import 'services/health.dart';
+import 'services/pdrm.dart';
 
-void main() {
-  runApp(const MyApp());
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  final themeController = ThemeController();
+  await themeController.loadThemeFromFirestore();
+
+  runApp(
+    ChangeNotifierProvider(
+      create: (_) => ThemeController(),
+      child: const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {
@@ -17,23 +44,121 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'SmartGov',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF1E446B)),
-        useMaterial3: true,
-      ),
-      routes: {
-        '/dashboard': (_) => const DashboardPage(),
-        '/services': (_) => const ServicePage(),
-        '/applications': (_) => const ApplicationPage(),
-        '/payments': (_) => const PaymentPage(),
-        '/notifications': (_) => const NotificationPage(),
-        '/profile': (_) => const ProfilePage(),
-        '/settings': (_) => const SettingsPage(),
+    return Consumer<ThemeController>(
+      builder: (context, theme, child) {
+        return MaterialApp(
+          debugShowCheckedModeBanner: false,
+          title: 'SmartGov',
+
+          // ================= LIGHT THEME =================
+          theme: ThemeData(
+            colorScheme: ColorScheme.fromSeed(
+              seedColor: const Color(0xFF1E446B),
+              brightness: Brightness.light,
+            ),
+            useMaterial3: true,
+          ),
+
+          // ================= DARK THEME =================
+          darkTheme: ThemeData(
+            useMaterial3: true,
+            brightness:
+                Brightness.dark, // Explicitly set for better icon contrast
+
+            colorScheme: const ColorScheme.dark(
+              primary: Color(0xFF6FA8DC),
+              secondary: Color(0xFF4A90E2),
+              surface: Color(
+                0xFF1E293B,
+              ), // Slightly lighter than background for depth
+              background: Color(0xFF0F172A),
+              onSurface: Colors.white,
+              onBackground: Colors.white,
+            ),
+
+            scaffoldBackgroundColor: const Color(0xFF0F172A),
+
+            // AppBar Theme
+            appBarTheme: const AppBarTheme(
+              backgroundColor: Color(0xFF0F172A),
+              foregroundColor: Colors.white,
+              elevation: 0,
+            ),
+
+            // Card Theme (IMPROVED)
+            cardTheme: const CardThemeData(
+              color: Color(0xFF1E293B), // Raised surface color
+              shadowColor: Colors.black54,
+              elevation: 4,
+              margin: EdgeInsets.symmetric(vertical: 8, horizontal: 0),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.all(Radius.circular(12)),
+              ),
+            ),
+
+            // Text Theme
+            textTheme: const TextTheme(
+              bodyLarge: TextStyle(color: Colors.white, fontSize: 16),
+              bodyMedium: TextStyle(
+                color: Color(0xFF94A3B8),
+                fontSize: 14,
+              ), // Slate-400 for secondary text
+              bodySmall: TextStyle(color: Color(0xFF64748B), fontSize: 12),
+              titleLarge: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+              titleMedium: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+
+            // Switch Theme
+            switchTheme: SwitchThemeData(
+              thumbColor: MaterialStateProperty.resolveWith((states) {
+                if (states.contains(MaterialState.selected))
+                  return const Color(0xFF6FA8DC);
+                return const Color(0xFF94A3B8);
+              }),
+              trackColor: MaterialStateProperty.resolveWith((states) {
+                if (states.contains(MaterialState.selected))
+                  return const Color(0xFF1E446B);
+                return const Color(0xFF334155);
+              }),
+            ),
+
+            dividerTheme: const DividerThemeData(
+              color: Color(0xFF334155),
+              thickness: 1,
+            ),
+          ),
+          // ================= THEME MODE =================
+          themeMode: theme.isDark ? ThemeMode.dark : ThemeMode.light,
+
+          // ================= ROUTES =================
+          initialRoute: FirebaseAuth.instance.currentUser == null
+              ? '/login'
+              : '/dashboard',
+
+          routes: {
+            '/dashboard': (_) => const DashboardPage(),
+            '/services': (_) => const ServicePage(),
+            '/applications': (_) => const ApplicationPage(),
+            '/payments': (_) => const PaymentPage(),
+            '/notifications': (_) => const NotificationPage(),
+            '/profile': (_) => const ProfilePage(),
+            '/settings': (_) => const SettingsPage(),
+            '/login': (_) => const LoginPage(),
+            // '/tax': (context) => const TaxPage(),
+            // '/epf': (context) => const EPFPage(),
+            // '/ptptn': (context) => const PTPTNPage(),
+            // '/jpj': (context) => const JPJPage(),
+            // '/health': (context) => const HealthPage(),
+            // '/pdrm': (context) => const PDRMPage(),
+          },
+        );
       },
-      home: const LoginPage(),
     );
   }
 }
@@ -68,8 +193,8 @@ class LoginPage extends StatelessWidget {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(12),
                 child: isDesktop
-                  ? const Row(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    ? const Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           Expanded(flex: 1, child: _BrandPanel()),
                           Expanded(flex: 1, child: _LoginPanel()),
@@ -177,10 +302,84 @@ class _LoginPanel extends StatefulWidget {
 
 class _LoginPanelState extends State<_LoginPanel> {
   _LoginMode _loginMode = _LoginMode.myDigitalId;
+  final TextEditingController otpController = TextEditingController();
+  final TextEditingController emailController = TextEditingController();
+  final TextEditingController passwordController = TextEditingController();
+  final AuthService _authService = AuthService();
+  bool _obscurePassword = true;
   bool _rememberMe = false;
+  bool _isLoading = false;
+
+  void _showQrPopup() {
+    String sessionId = DateTime.now().millisecondsSinceEpoch.toString();
+
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (context) {
+        return Dialog(
+          child: Container(
+            width: 300,
+            height: 350,
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  "Scan QR to Login",
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 20),
+
+                // ✅ IMPORTANT: Wrap with SizedBox
+                SizedBox(
+                  width: 200,
+                  height: 200,
+                  child: QrImageView(data: sessionId),
+                ),
+
+                const SizedBox(height: 12),
+
+                const Text(
+                  "Use MyDigital app to scan",
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
 
   void _openDashboard() {
     Navigator.of(context).pushReplacementNamed('/dashboard');
+  }
+
+  Future<void> loginWithQr(String userId) async {
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .get();
+
+      if (!doc.exists) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Invalid QR User')));
+        return;
+      }
+
+      // OPTIONAL: store role / user info
+      String role = doc['role'] ?? 'user';
+
+      // login success → go dashboard
+      _openDashboard();
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('QR Login Failed')));
+    }
   }
 
   @override
@@ -263,95 +462,161 @@ class _LoginPanelState extends State<_LoginPanel> {
   Widget _buildMyDigitalSection(BuildContext context) {
     return Column(
       children: [
+        // ================= QR SECTION =================
         Center(
-          child: Container(
-            width: 170,
-            height: 170,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: const Color(0xFFDADDE2),
-                width: 2,
-                style: BorderStyle.solid,
+          child: GestureDetector(
+            onTap: () async {
+              final sessionId = DateTime.now().millisecondsSinceEpoch
+                  .toString();
+
+              // create QR session in Firestore
+              await FirebaseFirestore.instance
+                  .collection('qr_sessions')
+                  .doc(sessionId)
+                  .set({
+                    'status': 'waiting',
+                    'uid': '',
+                    'email': '',
+                    'createdAt': DateTime.now(),
+                  });
+
+              // show QR popup
+              _showQrPopup();
+
+              // listen for approval
+              FirebaseFirestore.instance
+                  .collection('qr_sessions')
+                  .doc(sessionId)
+                  .snapshots()
+                  .listen((doc) {
+                    if (!doc.exists) return;
+
+                    if (doc['status'] == 'approved') {
+                      Navigator.pop(context); // close popup
+                      _openDashboard();
+                    }
+                  });
+            },
+            child: Container(
+              width: 170,
+              height: 170,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFFDADDE2), width: 2),
               ),
-            ),
-            child: const Icon(
-              Icons.qr_code_2,
-              size: 68,
-              color: Color(0xFFB8BEC8),
+              child: const Icon(
+                Icons.qr_code_2,
+                size: 68,
+                color: Color.fromARGB(255, 66, 86, 119),
+              ),
             ),
           ),
         ),
+
         const SizedBox(height: 16),
-        Center(
-          child: Text(
-            'Scan this QR code with your MyDigital ID app',
-            style: TextStyle(
-              color: Colors.black.withValues(alpha: 0.52),
-              fontSize: 16,
-            ),
-          ),
+
+        const Text(
+          'Scan this QR code with your MyDigital ID app',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: Colors.black54, fontSize: 16),
         ),
-        const SizedBox(height: 14),
+
+        const SizedBox(height: 18),
+
+        // ================= DIVIDER =================
         Row(
-          children: [
-            Expanded(
-              child: Divider(
-                color: Colors.black.withValues(alpha: 0.14),
-              ),
-            ),
+          children: const [
+            Expanded(child: Divider()),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: Text(
-                'or use OTP',
-                style: TextStyle(
-                  color: Colors.black.withValues(alpha: 0.48),
-                  fontSize: 16,
-                ),
-              ),
+              padding: EdgeInsets.symmetric(horizontal: 12),
+              child: Text('or use OTP'),
             ),
-            Expanded(
-              child: Divider(
-                color: Colors.black.withValues(alpha: 0.14),
-              ),
-            ),
+            Expanded(child: Divider()),
           ],
         ),
+
         const SizedBox(height: 14),
+
+        // ================= PHONE INPUT =================
         TextField(
+          controller: otpController,
           keyboardType: TextInputType.phone,
           decoration: InputDecoration(
             prefixIcon: const Icon(Icons.phone_android_outlined),
-            hintText: 'Phone number (e.g. 0123456789)',
+            hintText: 'Phone number',
             filled: true,
             fillColor: const Color(0xFFEDEFF2),
-            contentPadding: const EdgeInsets.symmetric(vertical: 14),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
               borderSide: BorderSide.none,
             ),
           ),
         ),
+
         const SizedBox(height: 12),
+
+        // ================= OTP BUTTON =================
         SizedBox(
           width: double.infinity,
           height: 50,
           child: FilledButton(
             style: FilledButton.styleFrom(
               backgroundColor: const Color(0xFF1F4468),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
             ),
-            onPressed: _openDashboard,
-            child: const Text(
-              'Send OTP  →',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.2,
-              ),
-            ),
+            onPressed: () async {
+              String phone = otpController.text.trim();
+
+              if (phone.isEmpty) return;
+
+              bool sent = await _authService.sendOtp(phone);
+
+              if (!sent) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Failed to send OTP')),
+                );
+                return;
+              }
+
+              showDialog(
+                context: context,
+                builder: (context) {
+                  TextEditingController otpInput = TextEditingController();
+
+                  return AlertDialog(
+                    title: const Text("Enter OTP"),
+                    content: TextField(
+                      controller: otpInput,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(hintText: "Enter OTP"),
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () async {
+                          bool success = await _authService.verifyOtp(
+                            otpInput.text,
+                          );
+
+                          if (success) {
+                            Navigator.pop(context);
+                            await Provider.of<ThemeController>(
+                              context,
+                              listen: false,
+                            ).loadThemeFromFirestore();
+                            _openDashboard();
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Invalid OTP')),
+                            );
+                          }
+                        },
+                        child: const Text("Verify"),
+                      ),
+                    ],
+                  );
+                },
+              );
+            },
+            child: const Text('Send OTP'),
           ),
         ),
       ],
@@ -363,7 +628,7 @@ class _LoginPanelState extends State<_LoginPanel> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'IC Number / Email',
+          'IC Number/Email',
           style: TextStyle(
             color: Color(0xFF2E3C4D),
             fontSize: 16,
@@ -371,21 +636,25 @@ class _LoginPanelState extends State<_LoginPanel> {
           ),
         ),
         const SizedBox(height: 10),
+
+        // ================= EMAIL =================
         TextField(
+          controller: emailController,
           keyboardType: TextInputType.emailAddress,
           decoration: InputDecoration(
             prefixIcon: const Icon(Icons.mail_outline),
-            hintText: 'Enter IC number or email',
+            hintText: 'Enter your IC/email',
             filled: true,
             fillColor: const Color(0xFFEDEFF2),
-            contentPadding: const EdgeInsets.symmetric(vertical: 14),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
               borderSide: BorderSide.none,
             ),
           ),
         ),
+
         const SizedBox(height: 14),
+
         const Text(
           'Password',
           style: TextStyle(
@@ -395,29 +664,40 @@ class _LoginPanelState extends State<_LoginPanel> {
           ),
         ),
         const SizedBox(height: 10),
+
+        // ================= PASSWORD =================
         TextField(
-          obscureText: true,
+          controller: passwordController,
+          obscureText: _obscurePassword,
           decoration: InputDecoration(
             prefixIcon: const Icon(Icons.lock_outline),
-            suffixIcon: const Icon(Icons.visibility_outlined),
             hintText: 'Enter password',
             filled: true,
             fillColor: const Color(0xFFEDEFF2),
-            contentPadding: const EdgeInsets.symmetric(vertical: 14),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
               borderSide: BorderSide.none,
             ),
+            suffixIcon: IconButton(
+              icon: Icon(
+                _obscurePassword ? Icons.visibility_off : Icons.visibility,
+              ),
+              onPressed: () {
+                setState(() {
+                  _obscurePassword = !_obscurePassword;
+                });
+              },
+            ),
           ),
         ),
+
         const SizedBox(height: 8),
-        Wrap(
-          alignment: WrapAlignment.spaceBetween,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          runSpacing: 2,
+
+        // ================= OPTIONS =================
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Row(
-              mainAxisSize: MainAxisSize.min,
               children: [
                 Checkbox(
                   value: _rememberMe,
@@ -437,20 +717,29 @@ class _LoginPanelState extends State<_LoginPanel> {
                 ),
               ],
             ),
+
+            // ================= FORGOT PASSWORD =================
             TextButton(
-              onPressed: () {},
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const ForgotPasswordPage()),
+                );
+              },
               child: const Text(
                 'Forgot password?',
                 style: TextStyle(
                   color: Color(0xFF1F4468),
-                  fontSize: 14,
                   fontWeight: FontWeight.w700,
                 ),
               ),
             ),
           ],
         ),
-        const SizedBox(height: 8),
+
+        const SizedBox(height: 10),
+
+        // ================= SIGN IN =================
         SizedBox(
           width: double.infinity,
           height: 50,
@@ -461,13 +750,74 @@ class _LoginPanelState extends State<_LoginPanel> {
                 borderRadius: BorderRadius.circular(12),
               ),
             ),
-            onPressed: _openDashboard,
+            onPressed: () async {
+              String input = emailController.text.trim();
+              String password = passwordController.text.trim();
+
+              if (input.isEmpty || password.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Please fill all fields')),
+                );
+                return;
+              }
+
+              setState(() => _isLoading = true);
+
+              try {
+                bool success = await _authService.login(input, password);
+
+                setState(() => _isLoading = false);
+
+                if (success) {
+                  await Provider.of<ThemeController>(
+                    context,
+                    listen: false,
+                  ).loadThemeFromFirestore();
+                  _openDashboard();
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Invalid credentials')),
+                  );
+                }
+              } catch (e) {
+                setState(() => _isLoading = false);
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(const SnackBar(content: Text('Login error')));
+              }
+            },
+            child: _isLoading
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 2,
+                    ),
+                  )
+                : const Text(
+                    'Sign In →',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                  ),
+          ),
+        ),
+
+        const SizedBox(height: 12),
+
+        // ================= SIGN UP =================
+        Center(
+          child: TextButton(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const RegisterPage()),
+              );
+            },
             child: const Text(
-              'Sign In  →',
+              "Don't have an account? Sign Up",
               style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.2,
+                color: Color(0xFF1F4468),
+                fontWeight: FontWeight.w600,
               ),
             ),
           ),
@@ -475,13 +825,18 @@ class _LoginPanelState extends State<_LoginPanel> {
       ],
     );
   }
+
+  @override
+  void dispose() {
+    otpController.dispose();
+    emailController.dispose();
+    passwordController.dispose();
+    super.dispose();
+  }
 }
 
 class _LoginSwitch extends StatelessWidget {
-  const _LoginSwitch({
-    required this.selectedMode,
-    required this.onChanged,
-  });
+  const _LoginSwitch({required this.selectedMode, required this.onChanged});
 
   final _LoginMode selectedMode;
   final ValueChanged<_LoginMode> onChanged;
@@ -571,8 +926,9 @@ class DashboardPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: const Color(0xFFEDEFF2),
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(6),
@@ -580,13 +936,10 @@ class DashboardPage extends StatelessWidget {
             borderRadius: BorderRadius.circular(12),
             child: Row(
               children: [
-                const SizedBox(
-                  width: 220,
-                  child: _DashboardSidebar(),
-                ),
+                const SizedBox(width: 220, child: _DashboardSidebar()),
                 Expanded(
                   child: Container(
-                    color: const Color(0xFFF5F5F7),
+                    color: theme.scaffoldBackgroundColor,
                     child: const _DashboardBody(),
                   ),
                 ),
@@ -619,6 +972,7 @@ class _DashboardSidebar extends StatelessWidget {
       color: const Color(0xFF214B74),
       child: Column(
         children: [
+          // ================= HEADER =================
           Container(
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
             decoration: BoxDecoration(
@@ -666,12 +1020,15 @@ class _DashboardSidebar extends StatelessWidget {
               ],
             ),
           ),
+
+          // ================= MENU =================
           Expanded(
             child: ListView.builder(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
               itemCount: _items.length,
               itemBuilder: (context, index) {
                 final item = _items[index];
+
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 8),
                   child: Container(
@@ -694,22 +1051,28 @@ class _DashboardSidebar extends StatelessWidget {
                       ),
                       onTap: () {
                         if (item.title == 'Services') {
-                          Navigator.of(context).pushReplacementNamed('/services');
+                          Navigator.pushReplacementNamed(context, '/services');
                         }
                         if (item.title == 'My Applications') {
-                          Navigator.of(context).pushReplacementNamed('/applications');
+                          Navigator.pushReplacementNamed(
+                            context,
+                            '/applications',
+                          );
                         }
                         if (item.title == 'Payments') {
-                          Navigator.of(context).pushReplacementNamed('/payments');
+                          Navigator.pushReplacementNamed(context, '/payments');
                         }
                         if (item.title == 'Notifications') {
-                          Navigator.of(context).pushReplacementNamed('/notifications');
+                          Navigator.pushReplacementNamed(
+                            context,
+                            '/notifications',
+                          );
                         }
                         if (item.title == 'Profile') {
-                          Navigator.of(context).pushReplacementNamed('/profile');
+                          Navigator.pushReplacementNamed(context, '/profile');
                         }
                         if (item.title == 'Settings') {
-                          Navigator.of(context).pushReplacementNamed('/settings');
+                          Navigator.pushReplacementNamed(context, '/settings');
                         }
                       },
                     ),
@@ -718,21 +1081,33 @@ class _DashboardSidebar extends StatelessWidget {
               },
             ),
           ),
+
+          // ================= LOGOUT (FIXED) =================
           Padding(
             padding: const EdgeInsets.fromLTRB(18, 4, 18, 16),
-            child: Row(
-              children: const [
-                Icon(Icons.logout, color: Color(0xFFC2D1DF)),
-                SizedBox(width: 10),
-                Text(
-                  'Logout',
-                  style: TextStyle(
-                    color: Color(0xFFC2D1DF),
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
+            child: InkWell(
+              onTap: () async {
+                await FirebaseAuth.instance.signOut();
+
+                // IMPORTANT: clear navigation stack
+                Navigator.of(
+                  context,
+                ).pushNamedAndRemoveUntil('/login', (route) => false);
+              },
+              child: const Row(
+                children: [
+                  Icon(Icons.logout, color: Color(0xFFC2D1DF)),
+                  SizedBox(width: 10),
+                  Text(
+                    'Logout',
+                    style: TextStyle(
+                      color: Color(0xFFC2D1DF),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ],
@@ -754,14 +1129,14 @@ class _DashboardBody extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Expanded(
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       'Selamat Pagi, Ahmad 👋',
                       style: TextStyle(
-                        color: Color(0xFF1E2D3F),
+                        color: Theme.of(context).colorScheme.onSurface,
                         fontSize: 28,
                         fontWeight: FontWeight.w700,
                       ),
@@ -770,7 +1145,7 @@ class _DashboardBody extends StatelessWidget {
                     Text(
                       "Here's your government services overview",
                       style: TextStyle(
-                        color: Color(0xFF6B7B8D),
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
                       ),
@@ -910,7 +1285,7 @@ class _TopStatCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFFF7F8FA),
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: const Color(0xFFD9DEE5)),
       ),
@@ -935,8 +1310,8 @@ class _TopStatCard extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             title,
-            style: const TextStyle(
-              color: Color(0xFF6B7B8D),
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
               fontSize: 12,
               fontWeight: FontWeight.w500,
             ),
@@ -944,8 +1319,8 @@ class _TopStatCard extends StatelessWidget {
           const SizedBox(height: 3),
           Text(
             value,
-            style: const TextStyle(
-              color: Color(0xFF1E2D3F),
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface,
               fontSize: 18,
               fontWeight: FontWeight.w700,
             ),
@@ -953,10 +1328,7 @@ class _TopStatCard extends StatelessWidget {
           const SizedBox(height: 3),
           Text(
             subtitle,
-            style: const TextStyle(
-              color: Color(0xFF7F8F9F),
-              fontSize: 11,
-            ),
+            style: const TextStyle(color: Color(0xFF7F8F9F), fontSize: 11),
           ),
         ],
       ),
@@ -969,10 +1341,11 @@ class _NotificationsPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFFF7F8FA),
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: const Color(0xFFD9DEE5)),
       ),
@@ -981,10 +1354,10 @@ class _NotificationsPanel extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Text(
+              Text(
                 'Notifications',
                 style: TextStyle(
-                  color: Color(0xFF1E2D3F),
+                  color: Theme.of(context).colorScheme.onSurface,
                   fontSize: 24,
                   fontWeight: FontWeight.w700,
                 ),
@@ -1102,10 +1475,17 @@ class _NoticeTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
-        color: urgent ? const Color(0xFFF9EFF0) : const Color(0xFFF0F3F6),
+        color: isDark
+            ? (urgent
+                  ? Colors.red.withValues(alpha: 0.12)
+                  : const Color(0xFF273449)) // darker tile
+            : (urgent ? const Color(0xFFF9EFF0) : const Color(0xFFF0F3F6)),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -1114,7 +1494,7 @@ class _NoticeTile extends StatelessWidget {
             width: 32,
             height: 32,
             decoration: BoxDecoration(
-              color: iconBg,
+              color: isDark ? iconColor.withValues(alpha: 0.15) : iconBg,
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(icon, color: iconColor, size: 16),
@@ -1126,8 +1506,8 @@ class _NoticeTile extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
-                    color: Color(0xFF1E2D3F),
+                  style: TextStyle(
+                    color: theme.colorScheme.onSurface,
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                   ),
@@ -1135,8 +1515,8 @@ class _NoticeTile extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   subtitle,
-                  style: const TextStyle(
-                    color: Color(0xFF7D8D9D),
+                  style: TextStyle(
+                    color: theme.colorScheme.onSurface.withOpacity(0.6),
                     fontSize: 11,
                   ),
                 ),
@@ -1147,7 +1527,9 @@ class _NoticeTile extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
-                color: const Color(0xFFF8D6D8),
+                color: isDark
+                    ? Colors.red.withValues(alpha: 0.2)
+                    : const Color(0xFFF8D6D8),
                 borderRadius: BorderRadius.circular(999),
               ),
               child: const Text(
@@ -1173,17 +1555,17 @@ class _QuickActionsPanel extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFFF7F8FA),
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: const Color(0xFFD9DEE5)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Quick Actions',
             style: TextStyle(
-              color: Color(0xFF1E2D3F),
+              color: Theme.of(context).colorScheme.onSurface,
               fontSize: 24,
               fontWeight: FontWeight.w700,
             ),
@@ -1208,10 +1590,7 @@ class _QuickActionsPanel extends StatelessWidget {
                   label: 'Book Clinic',
                   icon: Icons.event_note_outlined,
                 ),
-                _QuickActionTile(
-                  label: 'Check Aid',
-                  icon: Icons.card_giftcard,
-                ),
+                _QuickActionTile(label: 'Check Aid', icon: Icons.card_giftcard),
               ],
             ),
           ),
@@ -1229,9 +1608,14 @@ class _QuickActionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFFE9EDF2),
+        color: isDark
+            ? const Color(0xFF273449) // darker tile (match your system)
+            : const Color(0xFFE9EDF2),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -1241,16 +1625,26 @@ class _QuickActionTile extends StatelessWidget {
             width: 34,
             height: 34,
             decoration: BoxDecoration(
-              color: const Color(0xFFD8E0EA),
+              color: isDark
+                  ? theme.colorScheme.primary.withValues(alpha: 0.15)
+                  : const Color(0xFFD8E0EA),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(icon, color: const Color(0xFF2D4A68), size: 18),
+            child: Icon(
+              icon,
+              color: isDark
+                  ? theme.colorScheme.primary
+                  : const Color(0xFF2D4A68),
+              size: 18,
+            ),
           ),
           const SizedBox(height: 6),
           Text(
             label,
-            style: const TextStyle(
-              color: Color(0xFF2A3E55),
+            style: TextStyle(
+              color: isDark
+                  ? theme.colorScheme.onSurface
+                  : const Color(0xFF2A3E55),
               fontSize: 13,
               fontWeight: FontWeight.w600,
             ),

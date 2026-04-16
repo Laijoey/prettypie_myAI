@@ -1,28 +1,29 @@
 import 'package:flutter/material.dart';
 import 'chat_assistant_fab.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'package:firebase_auth/firebase_auth.dart';
 
 class PaymentPage extends StatelessWidget {
   const PaymentPage({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: const Color(0xFFEDEFF2),
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(6),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(12),
             child: Row(
-              children: const [
-                SizedBox(
-                  width: 220,
-                  child: _PaymentSidebar(),
-                ),
+              children: [
+                const SizedBox(width: 220, child: _PaymentSidebar()),
                 Expanded(
                   child: ColoredBox(
-                    color: Color(0xFFF5F5F7),
-                    child: _PaymentBody(),
+                    color: theme.scaffoldBackgroundColor,
+                    child: const _PaymentBody(),
                   ),
                 ),
               ],
@@ -127,47 +128,11 @@ class _PaymentSidebar extends StatelessWidget {
                           fontSize: 14,
                         ),
                       ),
-                      onTap: () {
-                        if (item.title == 'Dashboard') {
-                          Navigator.of(context).pushReplacementNamed('/dashboard');
-                        }
-                        if (item.title == 'Services') {
-                          Navigator.of(context).pushReplacementNamed('/services');
-                        }
-                        if (item.title == 'My Applications') {
-                          Navigator.of(context).pushReplacementNamed('/applications');
-                        }
-                        if (item.title == 'Notifications') {
-                          Navigator.of(context).pushReplacementNamed('/notifications');
-                        }
-                        if (item.title == 'Profile') {
-                          Navigator.of(context).pushReplacementNamed('/profile');
-                        }
-                        if (item.title == 'Settings') {
-                          Navigator.of(context).pushReplacementNamed('/settings');
-                        }
-                      },
+                      onTap: () {},
                     ),
                   ),
                 );
               },
-            ),
-          ),
-          const Padding(
-            padding: EdgeInsets.fromLTRB(18, 4, 18, 16),
-            child: Row(
-              children: [
-                Icon(Icons.logout, color: Color(0xFFC2D1DF)),
-                SizedBox(width: 10),
-                Text(
-                  'Logout',
-                  style: TextStyle(
-                    color: Color(0xFFC2D1DF),
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
             ),
           ),
         ],
@@ -176,8 +141,71 @@ class _PaymentSidebar extends StatelessWidget {
   }
 }
 
-class _PaymentBody extends StatelessWidget {
+class _PaymentBody extends StatefulWidget {
   const _PaymentBody();
+
+  @override
+  State<_PaymentBody> createState() => _PaymentBodyState();
+}
+
+class _PaymentBodyState extends State<_PaymentBody> {
+  // ✅ List is managed here now
+  final List<Map<String, dynamic>> _bills = [
+    {
+      "title": "Traffic Summons",
+      "subtitle": "PDRM",
+      "due": "20 Apr 2026",
+      "amount": "300.00",
+      "agency": "PDRM",
+      "reference": "SUMM-102934",
+    },
+    {
+      "title": "Road Tax Renewal",
+      "subtitle": "JPJ",
+      "due": "19 Apr 2026",
+      "amount": "90.00",
+      "agency": "JPJ",
+      "reference": "JPJ-77821",
+    },
+    {
+      "title": "PTPTN Monthly Payment",
+      "subtitle": "PTPTN",
+      "due": "15 Apr 2026",
+      "amount": "120.00",
+      "agency": "PTPTN",
+      "reference": "PTPTN-55211",
+    },
+  ];
+
+  Map<String, dynamic>? _activeBill;
+
+  @override
+  void initState() {
+    super.initState();
+    if (_bills.isNotEmpty) {
+      _activeBill = _bills.first;
+    }
+  }
+
+  void _onBillTapped(Map<String, dynamic> bill) {
+    setState(() {
+      _activeBill = bill;
+    });
+  }
+
+  void _handlePaymentSuccess() {
+    setState(() {
+      // 1. Remove the paid bill
+      _bills.removeWhere((b) => b['reference'] == _activeBill?['reference']);
+      
+      // 2. Automatically prefill the next bill in the list
+      if (_bills.isNotEmpty) {
+        _activeBill = _bills.first;
+      } else {
+        _activeBill = null;
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -187,30 +215,27 @@ class _PaymentBody extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(20, 14, 18, 14),
           child: ConstrainedBox(
             constraints: BoxConstraints(minHeight: constraints.maxHeight - 28),
-            child: const Column(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   'Payments',
                   style: TextStyle(
-                    color: Color(0xFF1E2D3F),
+                    color: Theme.of(context).colorScheme.onSurface,
                     fontSize: 28,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
-                SizedBox(height: 6),
-                Text(
-                  'Pay your government bills securely in one place',
-                  style: TextStyle(
-                    color: Color(0xFF6B7B8D),
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
+                const SizedBox(height: 16),
+                _OutstandingBillsCard(
+                  bills: _bills,
+                  onSelect: _onBillTapped,
                 ),
-                SizedBox(height: 16),
-                _OutstandingBillsCard(),
-                SizedBox(height: 18),
-                _MakePaymentCard(),
+                const SizedBox(height: 18),
+                _MakePaymentCard(
+                  billToPay: _activeBill,
+                  onSuccess: _handlePaymentSuccess,
+                ),
               ],
             ),
           ),
@@ -221,26 +246,29 @@ class _PaymentBody extends StatelessWidget {
 }
 
 class _OutstandingBillsCard extends StatelessWidget {
-  const _OutstandingBillsCard();
+  final List<Map<String, dynamic>> bills;
+  final Function(Map<String, dynamic>) onSelect;
+
+  const _OutstandingBillsCard({required this.bills, required this.onSelect});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFFF7F8FA),
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: const Color(0xFFD9DEE5)),
       ),
       child: Column(
-        children: const [
+        children: [
           Padding(
-            padding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             child: Row(
               children: [
                 Text(
                   'Outstanding Bills',
                   style: TextStyle(
-                    color: Color(0xFF1E2D3F),
+                    color: Theme.of(context).colorScheme.onSurface,
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
                   ),
@@ -248,27 +276,24 @@ class _OutstandingBillsCard extends StatelessWidget {
               ],
             ),
           ),
-          Divider(height: 1, color: Color(0xFFDDE3EA)),
-          _BillRow(
-            title: 'Traffic Summons',
-            subtitle: 'PDRM',
-            dueDate: 'Due: 20 Apr 2026',
-            amount: 'RM 300.00',
-          ),
-          Divider(height: 1, color: Color(0xFFDDE3EA)),
-          _BillRow(
-            title: 'Road Tax Renewal',
-            subtitle: 'JPJ',
-            dueDate: 'Due: 19 Apr 2026',
-            amount: 'RM 90.00',
-          ),
-          Divider(height: 1, color: Color(0xFFDDE3EA)),
-          _BillRow(
-            title: 'PTPTN Monthly Payment',
-            subtitle: 'PTPTN',
-            dueDate: 'Due: 15 Apr 2026',
-            amount: 'RM 120.00',
-          ),
+          Divider(height: 1, color: Theme.of(context).dividerColor),
+          if (bills.isEmpty)
+            const Padding(
+              padding: EdgeInsets.all(20),
+              child: Text("No bills remaining."),
+            ),
+          ...bills.map((bill) => Column(
+            children: [
+              _BillRow(
+                title: bill["title"],
+                subtitle: bill["subtitle"],
+                dueDate: "Due: ${bill["due"]}",
+                amount: "RM ${bill["amount"]}",
+                onTap: () => onSelect(bill),
+              ),
+              Divider(height: 1, color: Theme.of(context).dividerColor),
+            ],
+          )),
         ],
       ),
     );
@@ -281,73 +306,54 @@ class _BillRow extends StatelessWidget {
     required this.subtitle,
     required this.dueDate,
     required this.amount,
+    required this.onTap,
   });
 
   final String title;
   final String subtitle;
   final String dueDate;
   final String amount;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      child: Row(
-        children: [
-          Container(
-            width: 34,
-            height: 34,
-            decoration: BoxDecoration(
-              color: const Color(0xFFE5F4FD),
-              borderRadius: BorderRadius.circular(10),
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Row(
+          children: [
+            Container(
+              width: 34, height: 34,
+              decoration: BoxDecoration(
+                color: const Color(0xFFE5F4FD),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.receipt_long_outlined, color: Color(0xFF2AA0E6), size: 18),
             ),
-            child: const Icon(
-              Icons.receipt_long_outlined,
-              color: Color(0xFF2AA0E6),
-              size: 18,
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+                  Text('$subtitle - $dueDate', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.grey)),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    color: Color(0xFF1E2D3F),
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  '$subtitle - $dueDate',
-                  style: const TextStyle(
-                    color: Color(0xFF6F8094),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Text(
-            amount,
-            style: const TextStyle(
-              color: Color(0xFF1E2D3F),
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
+            Text(amount, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+          ],
+        ),
       ),
     );
   }
 }
 
 class _MakePaymentCard extends StatefulWidget {
-  const _MakePaymentCard();
+  final Map<String, dynamic>? billToPay;
+  final VoidCallback onSuccess;
+
+  const _MakePaymentCard({this.billToPay, required this.onSuccess});
 
   @override
   State<_MakePaymentCard> createState() => _MakePaymentCardState();
@@ -355,16 +361,67 @@ class _MakePaymentCard extends StatefulWidget {
 
 class _MakePaymentCardState extends State<_MakePaymentCard> {
   String _selectedAgency = 'PDRM';
-  final TextEditingController _referenceController =
-      TextEditingController(text: 'SUMM-102934');
-  final TextEditingController _amountController =
-      TextEditingController(text: '300.00');
+  final TextEditingController _refController = TextEditingController();
+  final TextEditingController _amountController = TextEditingController();
+  final String baseUrl = "https://prettypie-api-661875192859.asia-southeast1.run.app";
 
   @override
-  void dispose() {
-    _referenceController.dispose();
-    _amountController.dispose();
-    super.dispose();
+  void initState() {
+    super.initState();
+    _syncFields();
+  }
+
+  // ✅ This triggers the update when the parent changes the active bill
+  @override
+  void didUpdateWidget(_MakePaymentCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.billToPay != oldWidget.billToPay) {
+      _syncFields();
+    }
+  }
+
+  void _syncFields() {
+    if (widget.billToPay != null) {
+      setState(() {
+        _selectedAgency = widget.billToPay!['agency'];
+        _refController.text = widget.billToPay!['reference'];
+        _amountController.text = widget.billToPay!['amount'];
+      });
+    } else {
+      _refController.clear();
+      _amountController.clear();
+    }
+  }
+
+  Future<void> _processPayment() async {
+    if (widget.billToPay == null) return;
+
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      final token = await user?.getIdToken();
+
+      final response = await http.post(
+        Uri.parse("$baseUrl/pay"),
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer $token",
+        },
+        body: jsonEncode({
+          "agency": _selectedAgency,
+          "reference": _refController.text,
+          "amount": _amountController.text,
+          "category": _selectedAgency.toLowerCase(),
+        }),
+      );
+
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200 && data["success"] == true) {
+        widget.onSuccess();
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Payment Successful!")));
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+    }
   }
 
   @override
@@ -372,21 +429,14 @@ class _MakePaymentCardState extends State<_MakePaymentCard> {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFFF7F8FA),
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: const Color(0xFFD9DEE5)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Make Payment',
-            style: TextStyle(
-              color: Color(0xFF1E2D3F),
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
+          const Text('Make Payment', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
           const SizedBox(height: 10),
           Row(
             children: [
@@ -394,21 +444,14 @@ class _MakePaymentCardState extends State<_MakePaymentCard> {
                 child: _PaymentField(
                   label: 'Agency',
                   child: DropdownButtonFormField<String>(
-                    initialValue: _selectedAgency,
+                    value: _selectedAgency,
                     items: const [
                       DropdownMenuItem(value: 'PDRM', child: Text('PDRM')),
                       DropdownMenuItem(value: 'JPJ', child: Text('JPJ')),
                       DropdownMenuItem(value: 'PTPTN', child: Text('PTPTN')),
                     ],
-                    onChanged: (value) {
-                      if (value == null) {
-                        return;
-                      }
-                      setState(() {
-                        _selectedAgency = value;
-                      });
-                    },
-                    decoration: _fieldDecoration(),
+                    onChanged: (val) => setState(() => _selectedAgency = val!),
+                    decoration: _fieldDecoration(context),
                   ),
                 ),
               ),
@@ -416,10 +459,7 @@ class _MakePaymentCardState extends State<_MakePaymentCard> {
               Expanded(
                 child: _PaymentField(
                   label: 'Reference No.',
-                  child: TextField(
-                    controller: _referenceController,
-                    decoration: _fieldDecoration(),
-                  ),
+                  child: TextField(controller: _refController, decoration: _fieldDecoration(context)),
                 ),
               ),
             ],
@@ -427,35 +467,19 @@ class _MakePaymentCardState extends State<_MakePaymentCard> {
           const SizedBox(height: 10),
           _PaymentField(
             label: 'Amount (RM)',
-            child: TextField(
-              controller: _amountController,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: _fieldDecoration(),
-            ),
+            child: TextField(controller: _amountController, decoration: _fieldDecoration(context)),
           ),
           const SizedBox(height: 14),
           SizedBox(
             width: double.infinity,
             height: 44,
             child: FilledButton.icon(
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Payment submitted successfully.'),
-                    behavior: SnackBarBehavior.floating,
-                  ),
-                );
-              },
+              onPressed: _processPayment,
               icon: const Icon(Icons.lock_outline, size: 18),
-              label: const Text(
-                'Pay Now',
-                style: TextStyle(fontWeight: FontWeight.w700),
-              ),
+              label: const Text('Pay Now', style: TextStyle(fontWeight: FontWeight.w700)),
               style: FilledButton.styleFrom(
                 backgroundColor: const Color(0xFF1F4468),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
             ),
           ),
@@ -464,38 +488,25 @@ class _MakePaymentCardState extends State<_MakePaymentCard> {
     );
   }
 
-  InputDecoration _fieldDecoration() {
+  InputDecoration _fieldDecoration(BuildContext context) {
     return InputDecoration(
       filled: true,
-      fillColor: const Color(0xFFEFF2F6),
+      fillColor: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF273449) : const Color(0xFFEFF2F6),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: BorderSide.none,
-      ),
     );
   }
 }
 
 class _PaymentField extends StatelessWidget {
   const _PaymentField({required this.label, required this.child});
-
-  final String label;
-  final Widget child;
-
+  final String label; final Widget child;
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: const TextStyle(
-            color: Color(0xFF2E3C4D),
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
+        Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey)),
         const SizedBox(height: 6),
         child,
       ],
@@ -505,8 +516,5 @@ class _PaymentField extends StatelessWidget {
 
 class _PaymentNavItem {
   const _PaymentNavItem(this.title, this.icon, this.active);
-
-  final String title;
-  final IconData icon;
-  final bool active;
+  final String title; final IconData icon; final bool active;
 }

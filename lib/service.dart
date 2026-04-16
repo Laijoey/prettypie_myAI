@@ -1,28 +1,40 @@
 import 'package:flutter/material.dart';
 import 'chat_assistant_fab.dart';
+import 'dart:async';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:file_picker/file_picker.dart';
 
 class ServicePage extends StatelessWidget {
   const ServicePage({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFEDEFF2),
+      backgroundColor: theme.scaffoldBackgroundColor,
+      floatingActionButton: const ChatAssistantFab(),
+
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(6),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(12),
             child: Row(
-              children: const [
-                SizedBox(
-                  width: 220,
-                  child: _ServicesSidebar(),
-                ),
+              children: [
+                // ================= SIDEBAR =================
+                const SizedBox(width: 220, child: _ServicesSidebar()),
+
+                // ================= MAIN CONTENT =================
                 Expanded(
                   child: ColoredBox(
-                    color: Color(0xFFF5F5F7),
-                    child: _ServicesBody(),
+                    color: isDark
+                        ? theme.scaffoldBackgroundColor
+                        : const Color(0xFFF5F5F7),
+                    child: const _ServicesBody(),
                   ),
                 ),
               ],
@@ -30,7 +42,6 @@ class ServicePage extends StatelessWidget {
           ),
         ),
       ),
-      floatingActionButton: const ChatAssistantFab(),
     );
   }
 }
@@ -129,22 +140,34 @@ class _ServicesSidebar extends StatelessWidget {
                       ),
                       onTap: () {
                         if (item.title == 'Dashboard') {
-                          Navigator.of(context).pushReplacementNamed('/dashboard');
+                          Navigator.of(
+                            context,
+                          ).pushReplacementNamed('/dashboard');
                         }
                         if (item.title == 'My Applications') {
-                          Navigator.of(context).pushReplacementNamed('/applications');
+                          Navigator.of(
+                            context,
+                          ).pushReplacementNamed('/applications');
                         }
                         if (item.title == 'Payments') {
-                          Navigator.of(context).pushReplacementNamed('/payments');
+                          Navigator.of(
+                            context,
+                          ).pushReplacementNamed('/payments');
                         }
                         if (item.title == 'Notifications') {
-                          Navigator.of(context).pushReplacementNamed('/notifications');
+                          Navigator.of(
+                            context,
+                          ).pushReplacementNamed('/notifications');
                         }
                         if (item.title == 'Profile') {
-                          Navigator.of(context).pushReplacementNamed('/profile');
+                          Navigator.of(
+                            context,
+                          ).pushReplacementNamed('/profile');
                         }
                         if (item.title == 'Settings') {
-                          Navigator.of(context).pushReplacementNamed('/settings');
+                          Navigator.of(
+                            context,
+                          ).pushReplacementNamed('/settings');
                         }
                       },
                     ),
@@ -176,47 +199,99 @@ class _ServicesSidebar extends StatelessWidget {
   }
 }
 
-class _ServicesBody extends StatelessWidget {
+class _ServicesBody extends StatefulWidget {
   const _ServicesBody();
 
   @override
+  State<_ServicesBody> createState() => _ServicesBodyState();
+}
+
+class _ServicesBodyState extends State<_ServicesBody> {
+  String query = '';
+
+  @override
   Widget build(BuildContext context) {
+    final lowerQuery = query.toLowerCase();
+
+    List<_ServiceItem> filter(List<_ServiceItem> items) {
+      return items.where((item) {
+        final titleMatch = item.title.toLowerCase().contains(lowerQuery);
+
+        final subtitleMatch = item.subtitle.toLowerCase().contains(lowerQuery);
+
+        final subServiceMatch =
+            _subServiceMap[item.title]?.any(
+              (sub) => sub.toLowerCase().contains(lowerQuery),
+            ) ??
+            false;
+
+        return titleMatch || subtitleMatch || subServiceMatch;
+      }).toList();
+    }
+
+    final filteredPopular = filter(_popularItems);
+    final filteredAll = filter(_allItems);
+
     return LayoutBuilder(
       builder: (context, constraints) {
         return SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(20, 14, 18, 14),
           child: ConstrainedBox(
             constraints: BoxConstraints(minHeight: constraints.maxHeight - 28),
-            child: const Column(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // ================= TITLE =================
                 Text(
                   'Government Services',
                   style: TextStyle(
-                    color: Color(0xFF1E2D3F),
+                    color: Theme.of(context).colorScheme.onSurface,
                     fontSize: 28,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
-                SizedBox(height: 6),
+
+                const SizedBox(height: 6),
+
                 Text(
                   'Access all government services in one place',
                   style: TextStyle(
-                    color: Color(0xFF6B7B8D),
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
-                SizedBox(height: 16),
-                _SearchServicesField(),
-                SizedBox(height: 20),
+
+                const SizedBox(height: 16),
+
+                // ================= SEARCH =================
+                SearchServicesField(
+                  onSearch: (value) {
+                    setState(() {
+                      query = value;
+                    });
+                  },
+                ),
+
+                const SizedBox(height: 20),
+
+                // ================= POPULAR =================
                 _ServiceSectionTitle('Popular Services'),
-                SizedBox(height: 10),
-                _ServiceGrid(popular: true),
-                SizedBox(height: 18),
+                const SizedBox(height: 10),
+
+                filteredPopular.isEmpty
+                    ? const Text("No results found")
+                    : _ServiceGrid(items: filteredPopular, showArrow: true),
+
+                const SizedBox(height: 18),
+
+                // ================= ALL =================
                 _ServiceSectionTitle('All Services'),
-                SizedBox(height: 10),
-                _ServiceGrid(popular: false),
+                const SizedBox(height: 10),
+
+                filteredAll.isEmpty
+                    ? const Text("No results found")
+                    : _ServiceGrid(items: filteredAll, showArrow: false),
               ],
             ),
           ),
@@ -226,26 +301,85 @@ class _ServicesBody extends StatelessWidget {
   }
 }
 
-class _SearchServicesField extends StatelessWidget {
-  const _SearchServicesField();
+class SearchServicesField extends StatefulWidget {
+  final Function(String) onSearch;
+
+  const SearchServicesField({super.key, required this.onSearch});
+
+  @override
+  State<SearchServicesField> createState() => _SearchServicesFieldState();
+}
+
+class _SearchServicesFieldState extends State<SearchServicesField> {
+  final TextEditingController _controller = TextEditingController();
+  Timer? _debounce;
+
+  void _onSearchChanged(String query) {
+    // ✅ debounce (avoid too many calls)
+    if (_debounce?.isActive ?? false) _debounce!.cancel();
+
+    _debounce = Timer(const Duration(milliseconds: 300), () {
+      widget.onSearch(query);
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _debounce?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return TextField(
+      controller: _controller,
+      onChanged: _onSearchChanged, // 🔥 search while typing
+      style: TextStyle(color: theme.colorScheme.onSurface),
       decoration: InputDecoration(
-        isDense: true,
-        hintText: 'Search services... (e.g. renew license, check tax, apply bantuan)',
-        prefixIcon: const Icon(Icons.search),
+        hintText:
+            'Search services... (e.g. renew license, check tax, apply bantuan)',
+
+        hintStyle: TextStyle(
+          color: theme.colorScheme.onSurface.withOpacity(0.6),
+        ),
+
+        prefixIcon: Icon(
+          Icons.search,
+          color: theme.colorScheme.onSurfaceVariant,
+        ),
+
+        suffixIcon: _controller.text.isNotEmpty
+            ? IconButton(
+                icon: const Icon(Icons.clear),
+                onPressed: () {
+                  _controller.clear();
+                  widget.onSearch('');
+                  setState(() {}); // refresh clear button
+                },
+              )
+            : null,
+
         filled: true,
-        fillColor: const Color(0xFFF2F4F7),
-        contentPadding: const EdgeInsets.symmetric(vertical: 8),
+        fillColor: theme.colorScheme.surface,
+
+        contentPadding: const EdgeInsets.symmetric(vertical: 12),
+
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: Color(0xFFD9DEE5)),
+          borderSide: BorderSide(color: theme.dividerColor),
         ),
+
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: Color(0xFFD9DEE5)),
+          borderSide: BorderSide(color: theme.dividerColor),
+        ),
+
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(color: theme.colorScheme.primary),
         ),
       ),
     );
@@ -261,8 +395,8 @@ class _ServiceSectionTitle extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       label,
-      style: const TextStyle(
-        color: Color(0xFF1E2D3F),
+      style: TextStyle(
+        color: Theme.of(context).colorScheme.onSurface,
         fontSize: 20,
         fontWeight: FontWeight.w700,
       ),
@@ -271,14 +405,13 @@ class _ServiceSectionTitle extends StatelessWidget {
 }
 
 class _ServiceGrid extends StatelessWidget {
-  const _ServiceGrid({required this.popular});
+  const _ServiceGrid({required this.items, required this.showArrow});
 
-  final bool popular;
+  final List<_ServiceItem> items;
+  final bool showArrow;
 
   @override
   Widget build(BuildContext context) {
-    final items = popular ? _popularItems : _allItems;
-
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
@@ -293,12 +426,10 @@ class _ServiceGrid extends StatelessWidget {
         final item = items[index];
         return _ServiceTile(
           item: item,
-          showArrow: popular,
+          showArrow: showArrow,
           onTap: () {
             Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => _ServiceActionPage(item: item),
-              ),
+              MaterialPageRoute(builder: (_) => _ServiceActionPage(item: item)),
             );
           },
         );
@@ -312,6 +443,7 @@ class _ServiceTile extends StatelessWidget {
     required this.item,
     required this.showArrow,
     required this.onTap,
+    super.key,
   });
 
   final _ServiceItem item;
@@ -320,6 +452,14 @@ class _ServiceTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    //     final Map<String, String> routeMap = {
+    //       'Tax Filing': '/tax',
+    //       'EPF Management': '/epf',
+    //       'Health Services': '/health',
+    //       'Loan Payment': '/ptptn',
+    //       'License Renewal': '/jpj',
+    //       'Summons Payment': '/pdrm',
+    // };
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -328,7 +468,7 @@ class _ServiceTile extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
-            color: const Color(0xFFF7F8FA),
+            color: Theme.of(context).colorScheme.surface,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: const Color(0xFFD9DEE5)),
           ),
@@ -351,8 +491,8 @@ class _ServiceTile extends StatelessWidget {
                   children: [
                     Text(
                       item.title,
-                      style: const TextStyle(
-                        color: Color(0xFF1E2D3F),
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurface,
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
                       ),
@@ -408,6 +548,15 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
   bool get _isLicenseRenewal => widget.item.title == 'License Renewal';
   bool get _isSummonsPayment => widget.item.title == 'Summons Payment';
 
+  bool isLoading = false;
+  Map<String, dynamic>? taxResult;
+  Map<String, dynamic>? income;
+  List<dynamic>? reliefs;
+  String? taxStatus;
+
+  final String baseUrl =
+      "https://prettypie-api-661875192859.asia-southeast1.run.app";
+
   @override
   void dispose() {
     _tinController.dispose();
@@ -415,6 +564,109 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
     _amountController.dispose();
     super.dispose();
   }
+
+  Future<void> fillWithAI() async {
+    setState(() => isLoading = true);
+
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      final token = await user!.getIdToken();
+
+      final response = await http.post(
+        Uri.parse("$baseUrl/auto-fill-profile"),
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer $token",
+        },
+        body: jsonEncode({"uid": user.uid}),
+      );
+
+      final data = jsonDecode(response.body);
+
+      final profile = data["data"];
+
+      setState(() {
+        // ✅ PREFILL FORM (USER CAN STILL EDIT)
+        _tinController.text = profile["tin"] ?? "";
+        _idController.text = profile["identificationNumber"] ?? "";
+        _amountController.text =
+            profile["estimatedTax"]?.toString() ?? _amountController.text;
+
+        _taxType = profile["taxType"] ?? _taxType;
+        _assessmentYear = profile["assessmentYear"] ?? _assessmentYear;
+        _paymentCode = profile["paymentCode"] ?? _paymentCode;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Form filled with AI suggestions ✅")),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("AI fill failed: $e")));
+    } finally {
+      setState(() => isLoading = false);
+    }
+  }
+
+  Future<void> uploadDocument(String type) async {
+  try {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['pdf', 'jpg', 'png'],
+      withData: true,
+    );
+
+    if (result == null || result.files.first.bytes == null) return;
+
+    final file = result.files.first;
+
+    setState(() => isLoading = true);
+
+    final user = FirebaseAuth.instance.currentUser;
+    final token = await user!.getIdToken();
+
+    final request = http.MultipartRequest(
+      "POST",
+      Uri.parse("$baseUrl/upload-doc"), // ✅ updated endpoint
+    );
+
+    request.headers["Authorization"] = "Bearer $token";
+
+    // ✅ ADD TYPE (epf, health, loan, lesen, summons)
+    request.fields["type"] = type;
+
+    request.files.add(
+      http.MultipartFile.fromBytes(
+        "file",
+        file.bytes!,
+        filename: file.name,
+      ),
+    );
+
+    final response = await request.send();
+    final responseBody = await response.stream.bytesToString();
+
+    print("UPLOAD STATUS: ${response.statusCode}");
+    print("UPLOAD RESPONSE: $responseBody");
+
+    final data = jsonDecode(responseBody);
+
+    if (response.statusCode != 200 || data["success"] != true) {
+      throw Exception(data["error"] ?? "Upload failed");
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("Document uploaded successfully ✅")),
+    );
+  } catch (e) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text("Upload failed: $e")),
+    );
+  } finally {
+    setState(() => isLoading = false);
+  }
+}
 
   void _submitTaxPayment() {
     if (!(_formKey.currentState?.validate() ?? false)) {
@@ -496,20 +748,22 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
                 builder: (context, constraints) {
                   return SingleChildScrollView(
                     child: ConstrainedBox(
-                      constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                      constraints: BoxConstraints(
+                        minHeight: constraints.maxHeight,
+                      ),
                       child: _isTaxFiling
                           ? _buildTaxForm()
                           : _isEpfManagement
-                              ? _buildEpfForm()
-                              : _isHealthService
-                                  ? _buildHealthForm()
-                                  : _isLoanPayment
-                                      ? _buildLoanPaymentForm()
-                                      : _isLicenseRenewal
-                                          ? _buildLicenseRenewalForm()
-                                              : _isSummonsPayment
-                                                  ? _buildSummonsPaymentForm()
-                                          : _buildGenericForm(),
+                          ? _buildEpfForm()
+                          : _isHealthService
+                          ? _buildHealthForm()
+                          : _isLoanPayment
+                          ? _buildLoanPaymentForm()
+                          : _isLicenseRenewal
+                          ? _buildLicenseRenewalForm()
+                          : _isSummonsPayment
+                          ? _buildSummonsPaymentForm()
+                          : _buildGenericForm(),
                     ),
                   );
                 },
@@ -531,7 +785,9 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
                     : () {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            content: Text('${widget.item.title} service started.'),
+                            content: Text(
+                              '${widget.item.title} service started.',
+                            ),
                           ),
                         );
                       },
@@ -612,10 +868,7 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
           const SizedBox(height: 8),
           const Text(
             'Upload your supporting documents before continuing with EPF services.',
-            style: TextStyle(
-              color: Color(0xFF6F8094),
-              fontSize: 12,
-            ),
+            style: TextStyle(color: Color(0xFF6F8094), fontSize: 12),
           ),
           const SizedBox(height: 14),
           Container(
@@ -669,17 +922,33 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
                     ),
                   ],
                 ),
+
                 const SizedBox(height: 12),
+
                 SizedBox(
                   width: double.infinity,
                   height: 42,
                   child: OutlinedButton.icon(
-                    onPressed: () {},
+                    onPressed: () => uploadDocument("kwsp"),
                     icon: const Icon(Icons.file_upload_outlined),
                     label: const Text('Choose File'),
                   ),
                 ),
+
+                const SizedBox(height: 8),
+
+                SizedBox(
+                  width: double.infinity,
+                  height: 42,
+                  child: FilledButton.icon(
+                    onPressed: fillWithAI, // added
+                    icon: const Icon(Icons.auto_awesome),
+                    label: const Text('Auto Fill with AI'),
+                  ),
+                ),
+
                 const SizedBox(height: 10),
+
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(
@@ -719,83 +988,68 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
           _buildDocumentChip('EPF account statement'),
           _buildDocumentChip('Supporting withdrawal or contribution document'),
           const SizedBox(height: 14),
-          _buildInfoSection(
-            '1. Member (User) Information',
-            [
-              _buildInfoField('Full Name'),
-              _buildInfoField('IC Number (MyKad)'),
-              _buildInfoPair('Date of Birth', 'Gender'),
-              _buildInfoPair('Phone Number', 'Email Address'),
-              _buildInfoField('Address'),
-              _buildInfoField('Employment Status'),
-            ],
-          ),
-          _buildInfoSection(
-            '2. Employment Details',
-            [
-              _buildInfoPair('Employer Name', 'Company ID'),
-              _buildInfoPair('Start Date of Employment', 'Employment Type'),
-              _buildInfoField('Salary Amount (RM)'),
-            ],
-          ),
-          _buildInfoSection(
-            '3. Contribution Information',
-            [
-              _buildInfoPair('Employee Contribution (%)', 'Employee Contribution (RM)'),
-              _buildInfoPair('Employer Contribution (%)', 'Employer Contribution (RM)'),
-              _buildInfoField('Monthly Contribution Records'),
-              _buildInfoPair('Contribution Date', 'Total Accumulated Balance (RM)'),
-            ],
-          ),
-          _buildInfoSection(
-            '4. Account Structure',
-            [
-              _buildInfoPair('Account 1 Balance (RM)', 'Account 2 Balance (RM)'),
-              _buildInfoField('Account 3 Balance (optional)'),
-              _buildInfoField('Transaction History Summary'),
-            ],
-          ),
-          _buildInfoSection(
-            '5. Transaction Records',
-            [
-              _buildInfoField('Monthly Deposits'),
-              _buildInfoField('Withdrawals'),
-              _buildInfoField('Transfers Between Accounts'),
-              _buildInfoField('Dividend Payments'),
-            ],
-          ),
-          _buildInfoSection(
-            '6. Dividend / Interest Info',
-            [
-              _buildInfoPair('Annual Dividend Rate (%)', 'Dividend Earned Per Year (RM)'),
-              _buildInfoField('Historical Dividend Records'),
-            ],
-          ),
-          _buildInfoSection(
-            '7. Withdrawal Management',
-            [
-              _buildInfoField('Type of Withdrawal (housing, education, etc.)'),
-              _buildInfoPair('Amount Withdrawn (RM)', 'Date of Withdrawal'),
-              _buildInfoField('Approval Status'),
-            ],
-          ),
-          _buildInfoSection(
-            '8. Login & Security',
-            [
-              _buildInfoField('Username / ID'),
-              _buildInfoField('Password (encrypted placeholder)'),
-              _buildInfoField('Authentication Method (OTP, etc.)'),
-            ],
-          ),
-          _buildInfoSection(
-            '9. Reports / Summary',
-            [
-              _buildInfoField('Annual Statement'),
-              _buildInfoField('Contribution Summary'),
-              _buildInfoField('Total Savings Overview'),
-              _buildInfoField('Retirement Savings Simulation'),
-            ],
-          ),
+          _buildInfoSection('1. Member (User) Information', [
+            _buildInfoField('Full Name'),
+            _buildInfoField('IC Number (MyKad)'),
+            _buildInfoPair('Date of Birth', 'Gender'),
+            _buildInfoPair('Phone Number', 'Email Address'),
+            _buildInfoField('Address'),
+            _buildInfoField('Employment Status'),
+          ]),
+          _buildInfoSection('2. Employment Details', [
+            _buildInfoPair('Employer Name', 'Company ID'),
+            _buildInfoPair('Start Date of Employment', 'Employment Type'),
+            _buildInfoField('Salary Amount (RM)'),
+          ]),
+          _buildInfoSection('3. Contribution Information', [
+            _buildInfoPair(
+              'Employee Contribution (%)',
+              'Employee Contribution (RM)',
+            ),
+            _buildInfoPair(
+              'Employer Contribution (%)',
+              'Employer Contribution (RM)',
+            ),
+            _buildInfoField('Monthly Contribution Records'),
+            _buildInfoPair(
+              'Contribution Date',
+              'Total Accumulated Balance (RM)',
+            ),
+          ]),
+          _buildInfoSection('4. Account Structure', [
+            _buildInfoPair('Account 1 Balance (RM)', 'Account 2 Balance (RM)'),
+            _buildInfoField('Account 3 Balance (optional)'),
+            _buildInfoField('Transaction History Summary'),
+          ]),
+          _buildInfoSection('5. Transaction Records', [
+            _buildInfoField('Monthly Deposits'),
+            _buildInfoField('Withdrawals'),
+            _buildInfoField('Transfers Between Accounts'),
+            _buildInfoField('Dividend Payments'),
+          ]),
+          _buildInfoSection('6. Dividend / Interest Info', [
+            _buildInfoPair(
+              'Annual Dividend Rate (%)',
+              'Dividend Earned Per Year (RM)',
+            ),
+            _buildInfoField('Historical Dividend Records'),
+          ]),
+          _buildInfoSection('7. Withdrawal Management', [
+            _buildInfoField('Type of Withdrawal (housing, education, etc.)'),
+            _buildInfoPair('Amount Withdrawn (RM)', 'Date of Withdrawal'),
+            _buildInfoField('Approval Status'),
+          ]),
+          _buildInfoSection('8. Login & Security', [
+            _buildInfoField('Username / ID'),
+            _buildInfoField('Password (encrypted placeholder)'),
+            _buildInfoField('Authentication Method (OTP, etc.)'),
+          ]),
+          _buildInfoSection('9. Reports / Summary', [
+            _buildInfoField('Annual Statement'),
+            _buildInfoField('Contribution Summary'),
+            _buildInfoField('Total Savings Overview'),
+            _buildInfoField('Retirement Savings Simulation'),
+          ]),
         ],
       ),
     );
@@ -836,7 +1090,10 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
         decoration: InputDecoration(
           labelText: label,
           border: const OutlineInputBorder(),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 10,
+          ),
         ),
       ),
     );
@@ -878,10 +1135,7 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
           const SizedBox(height: 8),
           const Text(
             'Upload supporting documents, then fill in the required health registration details manually.',
-            style: TextStyle(
-              color: Color(0xFF6F8094),
-              fontSize: 12,
-            ),
+            style: TextStyle(color: Color(0xFF6F8094), fontSize: 12),
           ),
           const SizedBox(height: 14),
           Container(
@@ -935,20 +1189,40 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
                     ),
                   ],
                 ),
+
                 const SizedBox(height: 12),
+
+                // keep UI same, only add function
                 SizedBox(
                   width: double.infinity,
                   height: 42,
                   child: OutlinedButton.icon(
-                    onPressed: () {},
+                    onPressed: () => uploadDocument("kkm"),
                     icon: const Icon(Icons.file_upload_outlined),
                     label: const Text('Choose Document'),
                   ),
                 ),
+
+                const SizedBox(height: 8),
+
+                SizedBox(
+                  width: double.infinity,
+                  height: 42,
+                  child: FilledButton.icon(
+                    onPressed: fillWithAI, // added
+                    icon: const Icon(Icons.auto_awesome),
+                    label: const Text('Auto Fill with AI'),
+                  ),
+                ),
+
                 const SizedBox(height: 10),
+
                 Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(10),
@@ -967,85 +1241,60 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
             ),
           ),
           const SizedBox(height: 14),
-          _buildInfoSection(
-            '1. Personal Information (Basic Identity)',
-            [
-              _buildInfoField('Full Name'),
-              _buildInfoField('IC Number / Passport'),
-              _buildInfoPair('Date of Birth', 'Gender'),
-              _buildInfoField('Nationality'),
-            ],
-          ),
-          _buildInfoSection(
-            '2. Contact Information',
-            [
-              _buildInfoPair('Phone Number', 'Email Address'),
-              _buildInfoField('Home Address'),
-            ],
-          ),
-          _buildInfoSection(
-            '3. Health Profile (Very Important)',
-            [
-              _buildInfoField('Blood Type (if known)'),
-              _buildInfoField('Allergies (medication, food, etc.)'),
-              _buildInfoField('Existing Medical Conditions (diabetes, asthma, etc.)'),
-              _buildInfoField('Current Medications'),
-            ],
-          ),
-          _buildInfoSection(
-            '4. Emergency Contact',
-            [
-              _buildInfoField('Emergency Contact Name'),
-              _buildInfoPair('Relationship', 'Emergency Contact Phone Number'),
-            ],
-          ),
-          _buildInfoSection(
-            '5. Insurance / Payment Info',
-            [
-              _buildInfoField('Insurance Provider (if any)'),
-              _buildInfoField('Policy Number'),
-              _buildInfoField('Payment Method'),
-            ],
-          ),
-          _buildInfoSection(
-            '6. Appointment / Service Details',
-            [
-              _buildInfoField('Type of Service (check-up, vaccination, etc.)'),
-              _buildInfoPair('Preferred Date & Time', 'Selected Clinic / Hospital'),
-            ],
-          ),
-          _buildInfoSection(
-            '7. Health ID / Integration',
-            [
-              _buildInfoField('MyKad Number (Main ID)'),
-              _buildInfoField('Link to Government Systems (optional)'),
-            ],
-          ),
-          _buildInfoSection(
-            '8. Account & Login',
-            [
-              _buildInfoField('Username / Email'),
-              _buildInfoField('Password'),
-              _buildInfoField('OTP / Verification'),
-            ],
-          ),
-          _buildInfoSection(
-            '9. Consent & Declarations',
-            [
-              _buildInfoField('Consent to Share Medical Data (Yes/No)'),
-              _buildInfoField('Agreement to Terms & Privacy Policy (Yes/No)'),
-            ],
-          ),
-          _buildInfoSection(
-            'MVP Quick Registration',
-            [
-              _buildInfoPair('Name', 'IC Number'),
-              _buildInfoField('Phone Number'),
-              _buildInfoField('Allergy + Medical Condition Summary'),
-              _buildInfoField('Appointment Booking Notes'),
-              _buildInfoField('Emergency Contact (Name + Phone)'),
-            ],
-          ),
+          _buildInfoSection('1. Personal Information (Basic Identity)', [
+            _buildInfoField('Full Name'),
+            _buildInfoField('IC Number / Passport'),
+            _buildInfoPair('Date of Birth', 'Gender'),
+            _buildInfoField('Nationality'),
+          ]),
+          _buildInfoSection('2. Contact Information', [
+            _buildInfoPair('Phone Number', 'Email Address'),
+            _buildInfoField('Home Address'),
+          ]),
+          _buildInfoSection('3. Health Profile (Very Important)', [
+            _buildInfoField('Blood Type (if known)'),
+            _buildInfoField('Allergies (medication, food, etc.)'),
+            _buildInfoField(
+              'Existing Medical Conditions (diabetes, asthma, etc.)',
+            ),
+            _buildInfoField('Current Medications'),
+          ]),
+          _buildInfoSection('4. Emergency Contact', [
+            _buildInfoField('Emergency Contact Name'),
+            _buildInfoPair('Relationship', 'Emergency Contact Phone Number'),
+          ]),
+          _buildInfoSection('5. Insurance / Payment Info', [
+            _buildInfoField('Insurance Provider (if any)'),
+            _buildInfoField('Policy Number'),
+            _buildInfoField('Payment Method'),
+          ]),
+          _buildInfoSection('6. Appointment / Service Details', [
+            _buildInfoField('Type of Service (check-up, vaccination, etc.)'),
+            _buildInfoPair(
+              'Preferred Date & Time',
+              'Selected Clinic / Hospital',
+            ),
+          ]),
+          _buildInfoSection('7. Health ID / Integration', [
+            _buildInfoField('MyKad Number (Main ID)'),
+            _buildInfoField('Link to Government Systems (optional)'),
+          ]),
+          _buildInfoSection('8. Account & Login', [
+            _buildInfoField('Username / Email'),
+            _buildInfoField('Password'),
+            _buildInfoField('OTP / Verification'),
+          ]),
+          _buildInfoSection('9. Consent & Declarations', [
+            _buildInfoField('Consent to Share Medical Data (Yes/No)'),
+            _buildInfoField('Agreement to Terms & Privacy Policy (Yes/No)'),
+          ]),
+          _buildInfoSection('MVP Quick Registration', [
+            _buildInfoPair('Name', 'IC Number'),
+            _buildInfoField('Phone Number'),
+            _buildInfoField('Allergy + Medical Condition Summary'),
+            _buildInfoField('Appointment Booking Notes'),
+            _buildInfoField('Emergency Contact (Name + Phone)'),
+          ]),
         ],
       ),
     );
@@ -1074,10 +1323,7 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
           const SizedBox(height: 8),
           const Text(
             'Upload supporting documents and fill in payment details manually.',
-            style: TextStyle(
-              color: Color(0xFF6F8094),
-              fontSize: 12,
-            ),
+            style: TextStyle(color: Color(0xFF6F8094), fontSize: 12),
           ),
           const SizedBox(height: 14),
           Container(
@@ -1131,20 +1377,39 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
                     ),
                   ],
                 ),
+
                 const SizedBox(height: 12),
+
                 SizedBox(
                   width: double.infinity,
                   height: 42,
                   child: OutlinedButton.icon(
-                    onPressed: () {},
+                    onPressed: () => uploadDocument("ptptn"),
                     icon: const Icon(Icons.file_upload_outlined),
                     label: const Text('Choose Document'),
                   ),
                 ),
+
+                const SizedBox(height: 8),
+
+                SizedBox(
+                  width: double.infinity,
+                  height: 42,
+                  child: FilledButton.icon(
+                    onPressed: fillWithAI, // 👈 added
+                    icon: const Icon(Icons.auto_awesome),
+                    label: const Text('Auto Fill with AI'),
+                  ),
+                ),
+
                 const SizedBox(height: 10),
+
                 Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(10),
@@ -1163,76 +1428,56 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
             ),
           ),
           const SizedBox(height: 14),
-          _buildInfoSection(
-            '1. Borrower Identification (VERY IMPORTANT)',
-            [
-              _buildInfoField('Full Name'),
-              _buildInfoField('IC Number (MyKad)'),
-              _buildInfoField('PTPTN Loan Number (if available)'),
-            ],
-          ),
-          _buildInfoSection(
-            '2. Contact Information',
-            [
-              _buildInfoPair('Phone Number', 'Email Address'),
-            ],
-          ),
-          _buildInfoSection(
-            '3. Loan Details',
-            [
-              _buildInfoField('Outstanding Balance (auto-fetch placeholder)'),
-              _buildInfoField('Monthly Instalment Amount (auto-fetch placeholder)'),
-              _buildInfoField('Account Status (active / overdue)'),
-            ],
-          ),
-          _buildInfoSection(
-            '4. Payment Information',
-            [
-              _buildInfoField('Payment Amount (RM)'),
-              _buildInfoField('Payment Type (full settlement / monthly / extra payment)'),
-              _buildInfoField('Payment Method (FPX / card / e-wallet)'),
-            ],
-          ),
-          _buildInfoSection(
-            '5. Payment Reference Details',
-            [
-              _buildInfoPair('Payment Date', 'Reference Number (auto-generated placeholder)'),
-              _buildInfoField('Transaction ID'),
-            ],
-          ),
-          _buildInfoSection(
-            '6. Authentication / Verification',
-            [
-              _buildInfoField('Login Account'),
-              _buildInfoField('OTP / TAC Verification'),
-            ],
-          ),
-          _buildInfoSection(
-            '7. Confirmation & Receipt',
-            [
-              _buildInfoField('Payment Summary (before confirm)'),
-              _buildInfoField('Digital Receipt (after payment)'),
-              _buildInfoField('Send Receipt (download / email)'),
-            ],
-          ),
-          _buildInfoSection(
-            'Important Checks Before Payment',
-            [
-              _buildInfoField('IC / Loan Number verified'),
-              _buildInfoField('Payment amount verified'),
-              _buildInfoField('Payment type selected correctly'),
-            ],
-          ),
-          _buildInfoSection(
-            'MVP Quick Pay',
-            [
-              _buildInfoField('IC Number'),
-              _buildInfoField('Auto-fetched Loan Info (placeholder)'),
-              _buildInfoField('Enter Amount'),
-              _buildInfoField('Choose Payment Method'),
-              _buildInfoField('Confirm & Pay'),
-            ],
-          ),
+          _buildInfoSection('1. Borrower Identification (VERY IMPORTANT)', [
+            _buildInfoField('Full Name'),
+            _buildInfoField('IC Number (MyKad)'),
+            _buildInfoField('PTPTN Loan Number (if available)'),
+          ]),
+          _buildInfoSection('2. Contact Information', [
+            _buildInfoPair('Phone Number', 'Email Address'),
+          ]),
+          _buildInfoSection('3. Loan Details', [
+            _buildInfoField('Outstanding Balance (auto-fetch placeholder)'),
+            _buildInfoField(
+              'Monthly Instalment Amount (auto-fetch placeholder)',
+            ),
+            _buildInfoField('Account Status (active / overdue)'),
+          ]),
+          _buildInfoSection('4. Payment Information', [
+            _buildInfoField('Payment Amount (RM)'),
+            _buildInfoField(
+              'Payment Type (full settlement / monthly / extra payment)',
+            ),
+            _buildInfoField('Payment Method (FPX / card / e-wallet)'),
+          ]),
+          _buildInfoSection('5. Payment Reference Details', [
+            _buildInfoPair(
+              'Payment Date',
+              'Reference Number (auto-generated placeholder)',
+            ),
+            _buildInfoField('Transaction ID'),
+          ]),
+          _buildInfoSection('6. Authentication / Verification', [
+            _buildInfoField('Login Account'),
+            _buildInfoField('OTP / TAC Verification'),
+          ]),
+          _buildInfoSection('7. Confirmation & Receipt', [
+            _buildInfoField('Payment Summary (before confirm)'),
+            _buildInfoField('Digital Receipt (after payment)'),
+            _buildInfoField('Send Receipt (download / email)'),
+          ]),
+          _buildInfoSection('Important Checks Before Payment', [
+            _buildInfoField('IC / Loan Number verified'),
+            _buildInfoField('Payment amount verified'),
+            _buildInfoField('Payment type selected correctly'),
+          ]),
+          _buildInfoSection('MVP Quick Pay', [
+            _buildInfoField('IC Number'),
+            _buildInfoField('Auto-fetched Loan Info (placeholder)'),
+            _buildInfoField('Enter Amount'),
+            _buildInfoField('Choose Payment Method'),
+            _buildInfoField('Confirm & Pay'),
+          ]),
         ],
       ),
     );
@@ -1261,10 +1506,7 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
           const SizedBox(height: 8),
           const Text(
             'Upload your photo or use the existing JPJ photo, then complete the renewal details below.',
-            style: TextStyle(
-              color: Color(0xFF6F8094),
-              fontSize: 12,
-            ),
+            style: TextStyle(color: Color(0xFF6F8094), fontSize: 12),
           ),
           const SizedBox(height: 14),
           Container(
@@ -1318,30 +1560,55 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
                     ),
                   ],
                 ),
+
                 const SizedBox(height: 12),
+
+                // ONLY CHANGE: add function
                 SizedBox(
                   width: double.infinity,
                   height: 42,
                   child: OutlinedButton.icon(
-                    onPressed: () {},
+                    onPressed: () => uploadDocument("jpj"), 
                     icon: const Icon(Icons.file_upload_outlined),
                     label: const Text('Upload Photo'),
                   ),
                 ),
+
                 const SizedBox(height: 8),
+
+                // ONLY CHANGE: add AI autofill if needed
+                SizedBox(
+                  width: double.infinity,
+                  height: 42,
+                  child: FilledButton.icon(
+                    onPressed: fillWithAI, // reused AI function
+                    icon: const Icon(Icons.auto_awesome),
+                    label: const Text('Auto Fill with AI'),
+                  ),
+                ),
+
+                const SizedBox(height: 8),
+
+                // keep existing second button UI but still functional if you want
                 SizedBox(
                   width: double.infinity,
                   height: 42,
                   child: OutlinedButton.icon(
-                    onPressed: () {},
+                    onPressed:
+                        () {}, // optional: keep or map to uploadDocument too
                     icon: const Icon(Icons.photo_library_outlined),
                     label: const Text('Use Existing JPJ Photo'),
                   ),
                 ),
+
                 const SizedBox(height: 10),
+
                 Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(10),
@@ -1360,275 +1627,248 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
             ),
           ),
           const SizedBox(height: 14),
-          _buildInfoSection(
-            '1. Personal Identification (Core)',
-            [
-              _buildInfoField('Full Name'),
-              _buildInfoField('IC Number (MyKad) - Main Identifier'),
-              _buildInfoField('Date of Birth'),
-            ],
-          ),
-          _buildInfoSection(
-            '2. Licence Information',
-            [
-              _buildInfoField('Licence Number'),
-              _buildInfoPair('Licence Class (D, B2, etc.)', 'Expiry Date'),
-              _buildInfoField('Licence Status (active / expired / suspended)'),
-            ],
-          ),
-          _buildInfoSection(
-            '3. Contact Information',
-            [
-              _buildInfoPair('Phone Number', 'Email Address'),
-              _buildInfoField('Address'),
-            ],
-          ),
-          _buildInfoSection(
-            '4. Medical Declaration',
-            [
-              _buildInfoField('Health Condition Declaration'),
-              _buildInfoField('Vision / Medical Fitness'),
-            ],
-          ),
-          _buildInfoSection(
-            '5. Renewal Details & Payment',
-            [
-              _buildInfoField('Renewal Duration (1 year / 2 years / etc.)'),
-              _buildInfoField('Fee Amount (auto-calculated placeholder)'),
-              _buildInfoField('Payment Method (FPX / card / e-wallet)'),
-            ],
-          ),
-          _buildInfoSection(
-            '6. Delivery / Collection Method',
-            [
-              _buildInfoField('Self-Collect at Counter'),
-              _buildInfoField('Delivery Address (if posting licence)'),
-            ],
-          ),
-          _buildInfoSection(
-            '7. Verification & Security',
-            [
-              _buildInfoField('Login / Account'),
-              _buildInfoField('OTP / TAC Verification'),
-            ],
-          ),
-          _buildInfoSection(
-            '8. Confirmation',
-            [
-              _buildInfoField('Summary Before Payment'),
-              _buildInfoField('Receipt After Payment'),
-              _buildInfoField('Renewal Confirmation Status'),
-            ],
-          ),
-          _buildInfoSection(
-            'Important Checks',
-            [
-              _buildInfoField('Licence not blacklisted / suspended'),
-              _buildInfoField('No outstanding summons (if required)'),
-              _buildInfoField('Correct licence class selected'),
-            ],
-          ),
-          _buildInfoSection(
-            'MVP Quick Renewal',
-            [
-              _buildInfoField('IC Number'),
-              _buildInfoField('Auto-fetch licence info (placeholder)'),
-              _buildInfoField('Choose Renewal Duration'),
-              _buildInfoField('Pay / Done'),
-            ],
-          ),
+          _buildInfoSection('1. Personal Identification (Core)', [
+            _buildInfoField('Full Name'),
+            _buildInfoField('IC Number (MyKad) - Main Identifier'),
+            _buildInfoField('Date of Birth'),
+          ]),
+          _buildInfoSection('2. Licence Information', [
+            _buildInfoField('Licence Number'),
+            _buildInfoPair('Licence Class (D, B2, etc.)', 'Expiry Date'),
+            _buildInfoField('Licence Status (active / expired / suspended)'),
+          ]),
+          _buildInfoSection('3. Contact Information', [
+            _buildInfoPair('Phone Number', 'Email Address'),
+            _buildInfoField('Address'),
+          ]),
+          _buildInfoSection('4. Medical Declaration', [
+            _buildInfoField('Health Condition Declaration'),
+            _buildInfoField('Vision / Medical Fitness'),
+          ]),
+          _buildInfoSection('5. Renewal Details & Payment', [
+            _buildInfoField('Renewal Duration (1 year / 2 years / etc.)'),
+            _buildInfoField('Fee Amount (auto-calculated placeholder)'),
+            _buildInfoField('Payment Method (FPX / card / e-wallet)'),
+          ]),
+          _buildInfoSection('6. Delivery / Collection Method', [
+            _buildInfoField('Self-Collect at Counter'),
+            _buildInfoField('Delivery Address (if posting licence)'),
+          ]),
+          _buildInfoSection('7. Verification & Security', [
+            _buildInfoField('Login / Account'),
+            _buildInfoField('OTP / TAC Verification'),
+          ]),
+          _buildInfoSection('8. Confirmation', [
+            _buildInfoField('Summary Before Payment'),
+            _buildInfoField('Receipt After Payment'),
+            _buildInfoField('Renewal Confirmation Status'),
+          ]),
+          _buildInfoSection('Important Checks', [
+            _buildInfoField('Licence not blacklisted / suspended'),
+            _buildInfoField('No outstanding summons (if required)'),
+            _buildInfoField('Correct licence class selected'),
+          ]),
+          _buildInfoSection('MVP Quick Renewal', [
+            _buildInfoField('IC Number'),
+            _buildInfoField('Auto-fetch licence info (placeholder)'),
+            _buildInfoField('Choose Renewal Duration'),
+            _buildInfoField('Pay / Done'),
+          ]),
         ],
       ),
     );
   }
 
   Widget _buildSummonsPaymentForm() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFD9DEE5)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Summons Payment',
-            style: TextStyle(
-              color: Color(0xFF1E2D3F),
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-            ),
+  return Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(14),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: const Color(0xFFD9DEE5)),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Summons Payment',
+          style: TextStyle(
+            color: Color(0xFF1E2D3F),
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
           ),
-          const SizedBox(height: 8),
-          const Text(
-            'Enter your identification details to auto-fetch summons records, then complete the payment UI below.',
-            style: TextStyle(
-              color: Color(0xFF6F8094),
-              fontSize: 12,
-            ),
+        ),
+        const SizedBox(height: 8),
+        const Text(
+          'Enter your identification details to auto-fetch summons records, then complete the payment UI below.',
+          style: TextStyle(color: Color(0xFF6F8094), fontSize: 12),
+        ),
+
+        const SizedBox(height: 14),
+
+        // ===== UPLOAD CARD (ONLY ONE - FIXED) =====
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF5F8FC),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFDCE5F0)),
           ),
-          const SizedBox(height: 14),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF5F8FC),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFDCE5F0)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 42,
-                      height: 42,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE8F4FE),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(
-                        Icons.upload_file_outlined,
-                        color: Color(0xFF3DA5F5),
-                      ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE8F4FE),
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    const SizedBox(width: 12),
-                    const Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Summons lookup document',
-                            style: TextStyle(
-                              color: Color(0xFF1E2D3F),
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                            ),
+                    child: const Icon(
+                      Icons.upload_file_outlined,
+                      color: Color(0xFF3DA5F5),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Summons lookup document',
+                          style: TextStyle(
+                            color: Color(0xFF1E2D3F),
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
                           ),
-                          SizedBox(height: 2),
-                          Text(
-                            'Optional document upload placeholder for summons notice or related file.',
-                            style: TextStyle(
-                              color: Color(0xFF607489),
-                              fontSize: 12,
-                            ),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          'Optional document upload placeholder for summons notice or related file.',
+                          style: TextStyle(
+                            color: Color(0xFF607489),
+                            fontSize: 12,
                           ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  height: 42,
-                  child: OutlinedButton.icon(
-                    onPressed: () {},
-                    icon: const Icon(Icons.file_upload_outlined),
-                    label: const Text('Upload Summons Document'),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: const Color(0xFFDCE5F0)),
-                  ),
-                  child: const Text(
-                    'Accepted files: summons notice, notice image, or supporting PDF/image. UI only.',
-                    style: TextStyle(
-                      color: Color(0xFF6F8094),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
+                        ),
+                      ],
                     ),
                   ),
+                ],
+              ),
+
+              const SizedBox(height: 12),
+
+              // Upload button
+              SizedBox(
+                width: double.infinity,
+                height: 42,
+                child: OutlinedButton.icon(
+                  onPressed: () => uploadDocument("pdrm"),
+                  icon: const Icon(Icons.file_upload_outlined),
+                  label: const Text('Upload Summons Document'),
                 ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 14),
-          _buildInfoSection(
-            '1. Identification (VERY IMPORTANT)',
-            [
-              _buildInfoField('IC Number (MyKad)'),
-              _buildInfoField('Vehicle Plate Number'),
-              _buildInfoField('Summons Number (best & most accurate)'),
+              ),
+
+              const SizedBox(height: 8),
+
+              // AI autofill button
+              SizedBox(
+                width: double.infinity,
+                height: 42,
+                child: FilledButton.icon(
+                  onPressed: fillWithAI,
+                  icon: const Icon(Icons.auto_awesome),
+                  label: const Text('Auto Fill with AI'),
+                ),
+              ),
+
+              const SizedBox(height: 10),
+
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFDCE5F0)),
+                ),
+                child: const Text(
+                  'Accepted files: summons notice, notice image, or supporting PDF/image.',
+                  style: TextStyle(
+                    color: Color(0xFF6F8094),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
             ],
           ),
-          _buildInfoSection(
-            '2. Summons Details (Auto-Fetched)',
-            [
-              _buildInfoField('Summons Number'),
-              _buildInfoField('Offence Type (speeding, parking, etc.)'),
-              _buildInfoPair('Date & Location of Offence', 'Issuing Authority (PDRM / JPJ / council)'),
-              _buildInfoPair('Amount to Pay', 'Status (unpaid / discounted / overdue)'),
-            ],
+        ),
+
+        const SizedBox(height: 14),
+
+        // ===== REST OF YOUR FORM (UNCHANGED) =====
+        _buildInfoSection('1. Identification (VERY IMPORTANT)', [
+          _buildInfoField('IC Number (MyKad)'),
+          _buildInfoField('Vehicle Plate Number'),
+          _buildInfoField('Summons Number (best & most accurate)'),
+        ]),
+        _buildInfoSection('2. Summons Details (Auto-Fetched)', [
+          _buildInfoField('Summons Number'),
+          _buildInfoField('Offence Type (speeding, parking, etc.)'),
+          _buildInfoPair(
+            'Date & Location of Offence',
+            'Issuing Authority (PDRM / JPJ / council)',
           ),
-          _buildInfoSection(
-            '3. Contact Information',
-            [
-              _buildInfoPair('Phone Number', 'Email'),
-            ],
+          _buildInfoPair(
+            'Amount to Pay',
+            'Status (unpaid / discounted / overdue)',
           ),
-          _buildInfoSection(
-            '4. Payment Information',
-            [
-              _buildInfoField('Payment Amount (auto or editable)'),
-              _buildInfoField('Payment Type (single summons / multiple summons)'),
-              _buildInfoField('Payment Method (FPX / card / e-wallet)'),
-            ],
-          ),
-          _buildInfoSection(
-            '5. Transaction Details',
-            [
-              _buildInfoPair('Payment Date', 'Reference Number'),
-              _buildInfoField('Transaction ID'),
-            ],
-          ),
-          _buildInfoSection(
-            '6. Verification / Security',
-            [
-              _buildInfoField('Login (optional but recommended)'),
-              _buildInfoField('OTP / TAC Verification'),
-            ],
-          ),
-          _buildInfoSection(
-            '7. Confirmation & Receipt',
-            [
-              _buildInfoField('Payment Summary Before Confirm'),
-              _buildInfoField('Digital Receipt After Payment'),
-              _buildInfoField('Updated Status (paid)'),
-            ],
-          ),
-          _buildInfoSection(
-            'Important Checks',
-            [
-              _buildInfoField('Correct summons selected (if multiple)'),
-              _buildInfoField('Amount matches official record'),
-              _buildInfoField('Check discount campaigns / promotions'),
-            ],
-          ),
-          _buildInfoSection(
-            'MVP Quick Pay',
-            [
-              _buildInfoField('IC / Plate / Summons Number'),
-              _buildInfoField('Auto-fetch summons info (placeholder)'),
-              _buildInfoField('Enter Amount'),
-              _buildInfoField('Choose Payment Method'),
-              _buildInfoField('Confirm & Pay'),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
+        ]),
+        _buildInfoSection('3. Contact Information', [
+          _buildInfoPair('Phone Number', 'Email'),
+        ]),
+        _buildInfoSection('4. Payment Information', [
+          _buildInfoField('Payment Amount (auto or editable)'),
+          _buildInfoField('Payment Type (single summons / multiple summons)'),
+          _buildInfoField('Payment Method (FPX / card / e-wallet)'),
+        ]),
+        _buildInfoSection('5. Transaction Details', [
+          _buildInfoPair('Payment Date', 'Reference Number'),
+          _buildInfoField('Transaction ID'),
+        ]),
+        _buildInfoSection('6. Verification / Security', [
+          _buildInfoField('Login (optional but recommended)'),
+          _buildInfoField('OTP / TAC Verification'),
+        ]),
+        _buildInfoSection('7. Confirmation & Receipt', [
+          _buildInfoField('Payment Summary Before Confirm'),
+          _buildInfoField('Digital Receipt After Payment'),
+          _buildInfoField('Updated Status (paid)'),
+        ]),
+        _buildInfoSection('Important Checks', [
+          _buildInfoField('Correct summons selected (if multiple)'),
+          _buildInfoField('Amount matches official record'),
+          _buildInfoField('Check discount campaigns / promotions'),
+        ]),
+        _buildInfoSection('MVP Quick Pay', [
+          _buildInfoField('IC / Plate / Summons Number'),
+          _buildInfoField('Auto-fetch summons info (placeholder)'),
+          _buildInfoField('Enter Amount'),
+          _buildInfoField('Choose Payment Method'),
+          _buildInfoField('Confirm & Pay'),
+        ]),
+      ],
+    ),
+  );
+}
 
   Widget _buildDocumentChip(String label) {
     return Container(
@@ -1706,89 +1946,109 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
             const SizedBox(height: 10),
             Container(
               width: double.infinity,
-                    padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                      color: const Color(0xFFF5F8FC),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: const Color(0xFFDCE5F0)),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
+                color: const Color(0xFFF5F8FC),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFDCE5F0)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // ===== HEADER =====
+                  Row(
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE8F4FE),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(
+                          Icons.upload_file_outlined,
+                          color: Color(0xFF3DA5F5),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Container(
-                              width: 40,
-                              height: 40,
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFE8F4FE),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: const Icon(
-                                Icons.upload_file_outlined,
-                                color: Color(0xFF3DA5F5),
+                            Text(
+                              'Tax Document & AI Autofill',
+                              style: TextStyle(
+                                color: Color(0xFF1E2D3F),
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
                               ),
                             ),
-                            const SizedBox(width: 10),
-                            const Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Upload Tax Document',
-                                    style: TextStyle(
-                                      color: Color(0xFF1E2D3F),
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                  SizedBox(height: 2),
-                                  Text(
-                                    'UI only for now. Uploaded tax document will be used to auto-fill this form later.',
-                                    style: TextStyle(
-                                      color: Color(0xFF607489),
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ],
+                            SizedBox(height: 2),
+                            Text(
+                              'Upload document or use AI to auto-fill form fields',
+                              style: TextStyle(
+                                color: Color(0xFF607489),
+                                fontSize: 12,
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 10),
-                        SizedBox(
-                          width: double.infinity,
-                          height: 40,
-                          child: OutlinedButton.icon(
-                            onPressed: () {},
-                            icon: const Icon(Icons.file_upload_outlined),
-                            label: const Text('Choose Document'),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 10,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: const Color(0xFFDCE5F0)),
-                          ),
-                          child: const Text(
-                            'Accepted file: PDF, image, or document upload placeholder',
-                            style: TextStyle(
-                              color: Color(0xFF6F8094),
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ],
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  // ===== UPLOAD BUTTON =====
+                  SizedBox(
+                    width: double.infinity,
+                    height: 42,
+                    child: OutlinedButton.icon(
+                      onPressed: () => uploadDocument("lhdn"),
+                      icon: const Icon(Icons.upload_file),
+                      label: const Text("Upload Document"),
                     ),
                   ),
+
+                  const SizedBox(height: 8),
+
+                  // ===== AUTO FILL BUTTON =====
+                  SizedBox(
+                    width: double.infinity,
+                    height: 42,
+                    child: FilledButton.icon(
+                      onPressed: fillWithAI, // 👈 backend API
+                      icon: const Icon(Icons.auto_awesome),
+                      label: const Text("Auto Fill with AI"),
+                    ),
+                  ),
+
+                  const SizedBox(height: 10),
+
+                  // ===== INFO TEXT =====
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFFDCE5F0)),
+                    ),
+                    child: const Text(
+                      'Upload: PDF, image, or document\nAuto Fill: uses AI to prefill tax form fields',
+                      style: TextStyle(
+                        color: Color(0xFF6F8094),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
             const SizedBox(height: 12),
             const Text(
               '1. Tax Identification Number (TIN)',
@@ -1806,8 +2066,9 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
                 labelText: 'Tax Identification Number (TIN)',
                 border: OutlineInputBorder(),
               ),
-              validator: (value) =>
-                  (value == null || value.trim().isEmpty) ? 'TIN is required' : null,
+              validator: (value) => (value == null || value.trim().isEmpty)
+                  ? 'TIN is required'
+                  : null,
             ),
             const SizedBox(height: 12),
             const Text(
@@ -1838,9 +2099,7 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
             const SizedBox(height: 8),
             DropdownButtonFormField<String>(
               value: _taxType,
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
-              ),
+              decoration: const InputDecoration(border: OutlineInputBorder()),
               items: const [
                 DropdownMenuItem(
                   value: 'Income Tax (Cukai Pendapatan)',
@@ -1872,9 +2131,7 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
             const SizedBox(height: 8),
             DropdownButtonFormField<String>(
               value: _assessmentYear,
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
-              ),
+              decoration: const InputDecoration(border: OutlineInputBorder()),
               items: years
                   .map(
                     (year) => DropdownMenuItem<String>(
@@ -1904,13 +2161,20 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
             const SizedBox(height: 8),
             DropdownButtonFormField<String>(
               value: _paymentCode,
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
-              ),
+              decoration: const InputDecoration(border: OutlineInputBorder()),
               items: const [
-                DropdownMenuItem(value: '084', child: Text('084 - Balance of tax')),
-                DropdownMenuItem(value: '085', child: Text('085 - CP500 installment')),
-                DropdownMenuItem(value: '086', child: Text('086 - Additional assessment')),
+                DropdownMenuItem(
+                  value: '084',
+                  child: Text('084 - Balance of tax'),
+                ),
+                DropdownMenuItem(
+                  value: '085',
+                  child: Text('085 - CP500 installment'),
+                ),
+                DropdownMenuItem(
+                  value: '086',
+                  child: Text('086 - Additional assessment'),
+                ),
               ],
               onChanged: (value) {
                 if (value != null) {
@@ -1928,7 +2192,9 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
             const SizedBox(height: 8),
             TextFormField(
               controller: _amountController,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
               decoration: const InputDecoration(
                 labelText: 'Amount to pay (RM)',
                 border: OutlineInputBorder(),
@@ -1966,6 +2232,18 @@ class _ServiceItem {
   final Color iconColor;
   final Color iconBg;
 }
+
+const Map<String, List<String>> _subServiceMap = {
+  'Tax Filing': [
+    'Check Tax Status',
+    'Auto File Tax',
+    'Tax Return',
+    'Refund Inquiry',
+  ],
+  'EPF Management': ['Check Balance', 'Withdraw EPF'],
+  'License Renewal': ['Renew License', 'Road Tax Renewal'],
+  'Summons Payment': ['Check Summons', 'Pay Traffic Fine'],
+};
 
 const List<_ServiceItem> _popularItems = [
   _ServiceItem(

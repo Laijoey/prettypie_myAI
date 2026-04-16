@@ -6,22 +6,23 @@ class NotificationPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: const Color(0xFFEDEFF2),
+      backgroundColor: theme.scaffoldBackgroundColor, 
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(6),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(12),
             child: Row(
-              children: const [
+              children: [
                 SizedBox(
                   width: 220,
                   child: _NotificationSidebar(),
                 ),
                 Expanded(
                   child: ColoredBox(
-                    color: Color(0xFFF5F5F7),
+                    color: theme.scaffoldBackgroundColor,
                     child: _NotificationBody(),
                   ),
                 ),
@@ -261,7 +262,7 @@ class _NotificationBodyState extends State<_NotificationBody> {
                 Text(
                   'Notifications',
                   style: TextStyle(
-                    color: Color(0xFF1E2D3F),
+                    color: Theme.of(context).colorScheme.onSurface,
                     fontSize: 28,
                     fontWeight: FontWeight.w700,
                   ),
@@ -270,7 +271,7 @@ class _NotificationBodyState extends State<_NotificationBody> {
                 Text(
                   'Stay updated with your government services',
                   style: TextStyle(
-                    color: Color(0xFF6B7B8D),
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
                   ),
@@ -380,13 +381,13 @@ class _NotificationListCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFFF7F8FA),
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: const Color(0xFFD9DEE5)),
       ),
       child: Column(
         children: items.isEmpty
-            ? const [
+            ?[
                 Padding(
                   padding: EdgeInsets.symmetric(horizontal: 14, vertical: 20),
                   child: Align(
@@ -394,7 +395,7 @@ class _NotificationListCard extends StatelessWidget {
                     child: Text(
                       'No notifications in this category.',
                       style: TextStyle(
-                        color: Color(0xFF6F8094),
+                        color: Theme.of(context).colorScheme.onSurface,
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
                       ),
@@ -475,8 +476,8 @@ class _NotificationItem extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
-                    color: Color(0xFF1E2D3F),
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface,
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
                   ),

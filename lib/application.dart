@@ -6,22 +6,23 @@ class ApplicationPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: const Color(0xFFEDEFF2),
+      backgroundColor: theme.scaffoldBackgroundColor, 
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(6),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(12),
             child: Row(
-              children: const [
+              children: [
                 SizedBox(
                   width: 220,
                   child: _ApplicationSidebar(),
                 ),
                 Expanded(
                   child: ColoredBox(
-                    color: Color(0xFFF5F5F7),
+                    color: theme.scaffoldBackgroundColor,
                     child: _ApplicationBody(),
                   ),
                 ),
@@ -181,129 +182,172 @@ class _ApplicationBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(20, 14, 18, 14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: const [
-          Text(
-            'My Applications',
-            style: TextStyle(
-              color: Color(0xFF1E2D3F),
-              fontSize: 28,
-              fontWeight: FontWeight.w700,
-            ),
+  final theme = Theme.of(context);
+
+  return SingleChildScrollView(
+    padding: const EdgeInsets.fromLTRB(20, 14, 18, 14),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'My Applications',
+          style: TextStyle(
+            color: theme.colorScheme.onSurface,
+            fontSize: 30,
+            fontWeight: FontWeight.w700,
           ),
-          SizedBox(height: 6),
-          Text(
-            'Track all your government applications in one place',
-            style: TextStyle(
-              color: Color(0xFF6B7B8D),
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-            ),
+        ),
+
+        const SizedBox(height: 6),
+
+        Text(
+          'Track all your government applications in one place',
+          style: TextStyle(
+            color: theme.colorScheme.onSurfaceVariant,
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
           ),
-          SizedBox(height: 16),
-          _ApplicationTrackerCard(),
-          SizedBox(height: 18),
-          Row(
-            children: [
-              Icon(Icons.auto_awesome, color: Color(0xFFF7B500), size: 18),
-              SizedBox(width: 8),
-              Text(
-                'Suggested for You',
-                style: TextStyle(
-                  color: Color(0xFF1E2D3F),
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                ),
+        ),
+
+        const SizedBox(height: 16),
+
+        _ApplicationTrackerCard(),
+
+        const SizedBox(height: 18),
+
+        Row(
+          children: [
+            Icon(
+              Icons.auto_awesome,
+              color: theme.colorScheme.secondary, // ✅ FIXED
+              size: 18,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              'Suggested for You',
+              style: TextStyle(
+                color: theme.colorScheme.onSurface,
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
               ),
-            ],
-          ),
-          SizedBox(height: 10),
-          _SuggestionGrid(),
-        ],
-      ),
-    );
-  }
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 10),
+
+        _SuggestionGrid(),
+      ],
+    ),
+  );
+}
 }
 
 class _ApplicationTrackerCard extends StatelessWidget {
   const _ApplicationTrackerCard();
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFFF7F8FA),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFD9DEE5)),
-      ),
-      child: Column(
-        children: const [
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            child: Row(
-              children: [
-                Text(
-                  'Application Tracker',
-                  style: TextStyle(
-                    color: Color(0xFF1E2D3F),
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                  ),
+Widget build(BuildContext context) {
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+
+  return Container(
+    decoration: BoxDecoration(
+      color: Theme.of(context).colorScheme.surface,
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: const Color(0xFFD9DEE5)), // kept as-is
+    ),
+    child: Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          child: Row(
+            children: [
+              Text(
+                'Application Tracker',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurface,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-          Divider(height: 1, color: Color(0xFFDDE3EA)),
-          _ApplicationRow(
-            title: 'STR Aid Application',
-            subtitle: 'PADU • 28 Mar 2026',
-            status: 'Pending',
-            statusTextColor: Color(0xFFED9E00),
-            statusBgColor: Color(0xFFFFF1D6),
-            icon: Icons.schedule,
-            iconColor: Color(0xFFED9E00),
-            iconBgColor: Color(0xFFFFF1D6),
-          ),
-          Divider(height: 1, color: Color(0xFFDDE3EA)),
-          _ApplicationRow(
-            title: 'eKasih Registration',
-            subtitle: 'ICU JPM • 15 Mar 2026',
-            status: 'Approved',
-            statusTextColor: Color(0xFF2DBE63),
-            statusBgColor: Color(0xFFE4F6EC),
-            icon: Icons.check_circle_outline,
-            iconColor: Color(0xFF2DBE63),
-            iconBgColor: Color(0xFFE4F6EC),
-          ),
-          Divider(height: 1, color: Color(0xFFDDE3EA)),
-          _ApplicationRow(
-            title: 'License Renewal',
-            subtitle: 'JPJ • 1 Apr 2026',
-            status: 'Processing',
-            statusTextColor: Color(0xFF2AA0E6),
-            statusBgColor: Color(0xFFE5F4FD),
-            icon: Icons.timelapse,
-            iconColor: Color(0xFF2AA0E6),
-            iconBgColor: Color(0xFFE5F4FD),
-          ),
-          Divider(height: 1, color: Color(0xFFDDE3EA)),
-          _ApplicationRow(
-            title: 'PTPTN Repayment Plan',
-            subtitle: 'PTPTN • 10 Mar 2026',
-            status: 'Rejected',
-            statusTextColor: Color(0xFFE34B4B),
-            statusBgColor: Color(0xFFFBE9EA),
-            icon: Icons.cancel_outlined,
-            iconColor: Color(0xFFE34B4B),
-            iconBgColor: Color(0xFFFBE9EA),
-          ),
-        ],
-      ),
-    );
-  }
+        ),
+        Divider(height: 1, color: Theme.of(context).dividerColor),
+
+        // ================= PENDING =================
+        _ApplicationRow(
+          title: 'STR Aid Application',
+          subtitle: 'PADU • 28 Mar 2026',
+          status: 'Pending',
+          statusTextColor: Colors.orange,
+          statusBgColor: isDark
+              ? Colors.orange.withValues(alpha: 0.15)
+              : const Color(0xFFFFF1D6),
+          icon: Icons.schedule,
+          iconColor: Colors.orange,
+          iconBgColor: isDark
+              ? Colors.orange.withValues(alpha: 0.15)
+              : const Color(0xFFFFF1D6),
+        ),
+
+        Divider(height: 1, color: Theme.of(context).dividerColor),
+
+        // ================= APPROVED =================
+        _ApplicationRow(
+          title: 'eKasih Registration',
+          subtitle: 'ICU JPM • 15 Mar 2026',
+          status: 'Approved',
+          statusTextColor: Colors.green,
+          statusBgColor: isDark
+              ? Colors.green.withValues(alpha: 0.15)
+              : const Color(0xFFE4F6EC),
+          icon: Icons.check_circle_outline,
+          iconColor: Colors.green,
+          iconBgColor: isDark
+              ? Colors.green.withValues(alpha: 0.15)
+              : const Color(0xFFE4F6EC),
+        ),
+
+        Divider(height: 1, color: Theme.of(context).dividerColor),
+
+        // ================= PROCESSING =================
+        _ApplicationRow(
+          title: 'License Renewal',
+          subtitle: 'JPJ • 1 Apr 2026',
+          status: 'Processing',
+          statusTextColor: Colors.blue,
+          statusBgColor: isDark
+              ? Colors.blue.withValues(alpha: 0.15)
+              : const Color(0xFFE5F4FD),
+          icon: Icons.timelapse,
+          iconColor: Colors.blue,
+          iconBgColor: isDark
+              ? Colors.blue.withValues(alpha: 0.15)
+              : const Color(0xFFE5F4FD),
+        ),
+
+        Divider(height: 1, color: Theme.of(context).dividerColor),
+
+        // ================= REJECTED =================
+        _ApplicationRow(
+          title: 'PTPTN Repayment Plan',
+          subtitle: 'PTPTN • 10 Mar 2026',
+          status: 'Rejected',
+          statusTextColor: Colors.red,
+          statusBgColor: isDark
+              ? Colors.red.withValues(alpha: 0.15)
+              : const Color(0xFFFBE9EA),
+          icon: Icons.cancel_outlined,
+          iconColor: Colors.red,
+          iconBgColor: isDark
+              ? Colors.red.withValues(alpha: 0.15)
+              : const Color(0xFFFBE9EA),
+        ),
+      ],
+    ),
+  );
+}
 }
 
 class _ApplicationRow extends StatelessWidget {
@@ -349,8 +393,8 @@ class _ApplicationRow extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
-                    color: Color(0xFF1E2D3F),
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface,
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
                   ),
@@ -426,7 +470,7 @@ class _SuggestionTile extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFFF7F8FA),
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: const Color(0xFFD9DEE5)),
       ),
@@ -436,8 +480,8 @@ class _SuggestionTile extends StatelessWidget {
         children: [
           Text(
             title,
-            style: const TextStyle(
-              color: Color(0xFF1E2D3F),
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface,
               fontSize: 16,
               fontWeight: FontWeight.w700,
             ),

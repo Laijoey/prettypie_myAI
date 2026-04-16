@@ -1,38 +1,52 @@
 import 'package:flutter/material.dart';
 import 'chat_assistant_fab.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:provider/provider.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFEDEFF2),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(6),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: Row(
-              children: const [
-                SizedBox(
-                  width: 220,
-                  child: _SettingsSidebar(),
+Widget build(BuildContext context) {
+  final theme = Theme.of(context);
+  final isDark = theme.brightness == Brightness.dark;
+
+  return Scaffold(
+    backgroundColor: theme.scaffoldBackgroundColor,
+
+    // ✅ MUST BE HERE (outside body)
+    floatingActionButton: const ChatAssistantFab(),
+
+    body: SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(6),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: Row(
+            children: [
+              // ================= SIDEBAR =================
+              const SizedBox(
+                width: 220,
+                child: _SettingsSidebar(),
+              ),
+
+              // ================= MAIN CONTENT =================
+              Expanded(
+                child: ColoredBox(
+                  color: isDark
+                      ? theme.scaffoldBackgroundColor
+                      : const Color(0xFFF5F5F7),
+                  child: const _SettingsBody(),
                 ),
-                Expanded(
-                  child: ColoredBox(
-                    color: Color(0xFFF5F5F7),
-                    child: _SettingsBody(),
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
-      floatingActionButton: const ChatAssistantFab(),
-    );
-  }
+    ),
+  );
+}
 }
 
 class _SettingsSidebar extends StatelessWidget {
@@ -184,119 +198,294 @@ class _SettingsBody extends StatefulWidget {
 }
 
 class _SettingsBodyState extends State<_SettingsBody> {
+  final _uid = FirebaseAuth.instance.currentUser!.uid;
+
+  // ================= STATE =================
   bool _biometricLogin = true;
   bool _emailAlert = true;
   bool _smsAlert = false;
   bool _darkMode = false;
 
+  String _language = 'English (Malaysia)';
+  String _region = 'Kuala Lumpur';
+
+  bool _loading = true;
+
+  final List<String> _languages = [
+    'English (Malaysia)',
+    'Bahasa Melayu',
+    'Chinese'
+  ];
+
+  final List<String> _regions = [
+    'Johor',
+    'Kedah',
+    'Kelantan',
+    'Melaka',
+    'Negeri Sembilan',
+    'Pahang',
+    'Perak',
+    'Perlis',
+    'Pulau Pinang',
+    'Sabah',
+    'Sarawak',
+    'Selangor',
+    'Terengganu',
+    'Kuala Lumpur',
+    'Putrajaya',
+    'Labuan',
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSettings();
+  }
+
+  // ================= LOAD =================
+  Future<void> _loadSettings() async {
+  try {
+    final user = FirebaseAuth.instance.currentUser;
+
+    if (user == null) {
+      setState(() => _loading = false);
+      return;
+    }
+
+    final doc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .get();
+
+    if (doc.exists) {
+      final data = doc.data()!;
+
+      final theme = Provider.of<ThemeController>(
+        context,
+        listen: false,
+      );
+
+      setState(() {
+        _biometricLogin = data['biometric'] ?? true;
+        _emailAlert = data['emailAlert'] ?? true;
+        _smsAlert = data['smsAlert'] ?? false;
+        _darkMode = data['darkMode'] ?? false;
+        _language = data['language'] ?? _language;
+        _region = data['region'] ?? _region;
+      });
+
+      // ✅ APPLY DARK MODE HERE (after data exists)
+      theme.setDarkMode(data['darkMode'] ?? false);
+    }
+  } catch (e) {
+    print("ERROR: $e");
+  } finally {
+    setState(() => _loading = false);
+  }
+}
+
+  // ================= SAVE =================
+  Future<void> _saveSettings() async {
+  final user = FirebaseAuth.instance.currentUser;
+  if (user == null) return;
+
+  await FirebaseFirestore.instance
+      .collection('users')
+      .doc(user.uid)
+      .set({
+    'biometric': _biometricLogin,
+    'emailAlert': _emailAlert,
+    'smsAlert': _smsAlert,
+    'darkMode': _darkMode,
+    'language': _language,
+    'region': _region,
+  }, SetOptions(merge: true)); // ✅ IMPORTANT
+
+  ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(content: Text('Settings saved')),
+  );
+}
+
+  // ================= CHANGE PASSWORD =================
+  Future<void> _changePasswordDialog() async {
+    final controller = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text("Change Password"),
+        content: TextField(
+          controller: controller,
+          obscureText: true,
+          decoration: const InputDecoration(
+            hintText: "Enter new password",
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cancel"),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              try {
+                await FirebaseAuth.instance.currentUser!
+                    .updatePassword(controller.text);
+
+                Navigator.pop(context);
+
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text("Password updated")),
+                );
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text("Error: $e")),
+                );
+              }
+            },
+            child: const Text("Update"),
+          )
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(20, 14, 18, 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Settings',
             style: TextStyle(
-              color: Color(0xFF1E2D3F),
+              color: Theme.of(context).colorScheme.onSurface,
               fontSize: 28,
               fontWeight: FontWeight.w700,
             ),
           ),
-          const SizedBox(height: 6),
-          const Text(
-            'Manage your account, security, and notification preferences',
-            style: TextStyle(
-              color: Color(0xFF6B7B8D),
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
+
           const SizedBox(height: 14),
+
+          // ================= ACCOUNT =================
           const _SettingsSectionTitle('Account'),
           const SizedBox(height: 10),
+
           _SettingsCard(
-            children: const [
-              _InfoRow(label: 'Preferred Language', value: 'English (Malaysia)'),
-              _InfoRow(label: 'Region', value: 'Kuala Lumpur'),
-              _InfoRow(label: 'Account Type', value: 'Citizen'),
+            children: [
+              // LANGUAGE
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: DropdownButtonFormField(
+                  value: _language,
+                  items: _languages
+                      .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                      .toList(),
+                  onChanged: (value) {
+                    setState(() => _language = value!);
+                  },
+                  decoration: const InputDecoration(
+                    labelText: "Preferred Language",
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ),
+
+              // REGION
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: DropdownButtonFormField(
+                  value: _region,
+                  items: _regions
+                      .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                      .toList(),
+                  onChanged: (value) {
+                    setState(() => _region = value!);
+                  },
+                  decoration: const InputDecoration(
+                    labelText: "Region",
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ),
             ],
           ),
+
           const SizedBox(height: 14),
+
+          // ================= SECURITY =================
           const _SettingsSectionTitle('Security'),
           const SizedBox(height: 10),
+
           _SettingsCard(
             children: [
               _ToggleRow(
                 title: 'Biometric Login',
-                subtitle: 'Use fingerprint or face ID for sign in',
+                subtitle: 'Use fingerprint or face ID',
                 value: _biometricLogin,
-                onChanged: (value) {
-                  setState(() {
-                    _biometricLogin = value;
-                  });
-                },
+                onChanged: (v) => setState(() => _biometricLogin = v),
               ),
-              const Divider(height: 1, color: Color(0xFFDDE3EA)),
-              const _ActionRow(
-                title: 'Change Password',
-                subtitle: 'Update your account password',
+              const Divider(),
+
+              ListTile(
+                title: const Text("Change Password"),
+                subtitle: const Text("Update your account password"),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: _changePasswordDialog,
               ),
             ],
           ),
+
           const SizedBox(height: 14),
+
+          // ================= NOTIFICATIONS =================
           const _SettingsSectionTitle('Notifications'),
           const SizedBox(height: 10),
+
           _SettingsCard(
             children: [
               _ToggleRow(
                 title: 'Email Alerts',
-                subtitle: 'Get important updates by email',
+                subtitle: 'Get updates by email',
                 value: _emailAlert,
-                onChanged: (value) {
-                  setState(() {
-                    _emailAlert = value;
-                  });
-                },
+                onChanged: (v) => setState(() => _emailAlert = v),
               ),
-              const Divider(height: 1, color: Color(0xFFDDE3EA)),
+              const Divider(),
+
               _ToggleRow(
                 title: 'SMS Alerts',
-                subtitle: 'Receive reminders via SMS',
+                subtitle: 'Receive SMS reminders',
                 value: _smsAlert,
-                onChanged: (value) {
-                  setState(() {
-                    _smsAlert = value;
-                  });
-                },
+                onChanged: (v) => setState(() => _smsAlert = v),
               ),
-              const Divider(height: 1, color: Color(0xFFDDE3EA)),
+              const Divider(),
+
               _ToggleRow(
                 title: 'Dark Mode',
-                subtitle: 'Enable darker interface theme',
+                subtitle: 'Enable dark theme',
                 value: _darkMode,
-                onChanged: (value) {
-                  setState(() {
-                    _darkMode = value;
-                  });
-                },
+                onChanged: (v) {
+                  setState(() => setState(() => _darkMode = v));
+                  Provider.of<ThemeController>(context, listen: false)
+                  .setDarkMode(v);
+                }
               ),
             ],
           ),
+
           const SizedBox(height: 16),
+
+          // ================= SAVE =================
           SizedBox(
             width: 180,
             height: 44,
             child: FilledButton(
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Settings saved successfully.'),
-                    behavior: SnackBarBehavior.floating,
-                  ),
-                );
-              },
+              onPressed: _saveSettings,
               style: FilledButton.styleFrom(
                 backgroundColor: const Color(0xFF1F4468),
                 shape: RoundedRectangleBorder(
@@ -313,6 +502,7 @@ class _SettingsBodyState extends State<_SettingsBody> {
       ),
     );
   }
+
 }
 
 class _SettingsSectionTitle extends StatelessWidget {
@@ -324,11 +514,10 @@ class _SettingsSectionTitle extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       title,
-      style: const TextStyle(
-        color: Color(0xFF1E2D3F),
-        fontSize: 18,
-        fontWeight: FontWeight.w700,
-      ),
+      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+  fontSize: 18, // Overriding only the size if needed
+  fontWeight: FontWeight.w700,
+),
     );
   }
 }
@@ -342,7 +531,7 @@ class _SettingsCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFFF7F8FA),
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: const Color(0xFFD9DEE5)),
       ),
@@ -375,8 +564,8 @@ class _InfoRow extends StatelessWidget {
           ),
           Text(
             value,
-            style: const TextStyle(
-              color: Color(0xFF1E2D3F),
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface,
               fontSize: 13,
               fontWeight: FontWeight.w700,
             ),
@@ -412,8 +601,8 @@ class _ToggleRow extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
-                    color: Color(0xFF1E2D3F),
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface,
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
                   ),
@@ -449,7 +638,7 @@ class _ActionRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Padding(
+    return Padding(
       padding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       child: Row(
         children: [
@@ -460,7 +649,7 @@ class _ActionRow extends StatelessWidget {
                 Text(
                   'Change Password',
                   style: TextStyle(
-                    color: Color(0xFF1E2D3F),
+                    color: Theme.of(context).colorScheme.onSurface,
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
                   ),
@@ -469,8 +658,8 @@ class _ActionRow extends StatelessWidget {
                 Text(
                   'Update your account password',
                   style: TextStyle(
-                    color: Color(0xFF6F8094),
-                    fontSize: 11,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    fontSize: 10,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -490,4 +679,34 @@ class _SettingsNavItem {
   final String title;
   final IconData icon;
   final bool active;
+}
+
+class ThemeController extends ChangeNotifier {
+  bool isDark = false;
+
+  void setDarkMode(bool value) {
+    isDark = value;
+    notifyListeners();
+  }
+
+  // ✅ LOAD FROM FIRESTORE
+  Future<void> loadThemeFromFirestore() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+
+      if (doc.exists) {
+        final data = doc.data()!;
+        isDark = data['darkMode'] ?? false;
+        notifyListeners(); // 🔥 triggers UI update
+      }
+    } catch (e) {
+      print("Theme load error: $e");
+    }
+  }
 }

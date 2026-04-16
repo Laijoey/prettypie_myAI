@@ -43,3 +43,19 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Exclude specific service files
+lib/services/tax.dart
+lib/services/epf.dart
+lib/services/health.dart
+lib/services/jpj.dart
+lib/services/pdrm.dart
+lib/services/ptptn.dart
+
+# Exclude the entire widgets directory
+lib/widgets/
+
+# Pro-tip: You should also ignore these based on your status
+node_modules/
+.vscode/
+android/app/google-services.json

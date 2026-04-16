@@ -1,0 +1,2 @@
+[[build.buildpacks]]
+id = "google.nodejs.npm"

@@ -68,12 +68,13 @@ class _AiAssistantPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Material(
       color: Colors.transparent,
       child: Container(
         width: width,
         decoration: BoxDecoration(
-          color: const Color(0xFFF2F3F5),
+          color: theme.colorScheme.surface,
           borderRadius: BorderRadius.circular(18),
           boxShadow: const [
             BoxShadow(
@@ -127,13 +128,13 @@ class _AiAssistantPanel extends StatelessWidget {
                       vertical: 12,
                     ),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFDEE2E6),
+                      color: theme.colorScheme.surface.withOpacity(0.8),
                       borderRadius: BorderRadius.circular(14),
                     ),
-                    child: const Text(
+                    child: Text(
                       'Selamat datang!  How can I help you today? You can ask about government services, applications, or payments.',
                       style: TextStyle(
-                        color: Color(0xFF182637),
+                        color: theme.colorScheme.onSurface,
                         fontSize: 13,
                         fontWeight: FontWeight.w500,
                       ),
@@ -177,17 +178,17 @@ class _AiAssistantPanel extends StatelessWidget {
                       alignment: Alignment.centerLeft,
                       padding: const EdgeInsets.symmetric(horizontal: 12),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFDEE2E6),
+                        color: theme.colorScheme.surface.withOpacity(0.8),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: TextField(
                         controller: controller,
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           isDense: true,
                           border: InputBorder.none,
                           hintText: 'Type your question...',
                           hintStyle: TextStyle(
-                            color: Color(0xFF9AA5B3),
+                            color: theme.colorScheme.onSurface.withOpacity(0.6),
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -222,19 +223,20 @@ class _PromptChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return InkWell(
       borderRadius: BorderRadius.circular(16),
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: const Color(0xFFE8EDF2),
+          color: theme.colorScheme.onSurface,
           borderRadius: BorderRadius.circular(16),
         ),
         child: Text(
           label,
-          style: const TextStyle(
-            color: Color(0xFF1F4A72),
+          style: TextStyle(
+            color: theme.colorScheme.surface,
             fontSize: 12,
             fontWeight: FontWeight.w600,
           ),

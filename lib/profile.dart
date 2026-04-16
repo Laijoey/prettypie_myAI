@@ -1,27 +1,27 @@
 import 'package:flutter/material.dart';
 import 'chat_assistant_fab.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: const Color(0xFFEDEFF2),
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(6),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(12),
             child: Row(
-              children: const [
-                SizedBox(
-                  width: 220,
-                  child: _ProfileSidebar(),
-                ),
+              children: [
+                SizedBox(width: 220, child: _ProfileSidebar()),
                 Expanded(
                   child: ColoredBox(
-                    color: Color(0xFFF5F5F7),
+                    color: theme.scaffoldBackgroundColor,
                     child: _ProfileBody(),
                   ),
                 ),
@@ -129,22 +129,34 @@ class _ProfileSidebar extends StatelessWidget {
                       ),
                       onTap: () {
                         if (item.title == 'Dashboard') {
-                          Navigator.of(context).pushReplacementNamed('/dashboard');
+                          Navigator.of(
+                            context,
+                          ).pushReplacementNamed('/dashboard');
                         }
                         if (item.title == 'Services') {
-                          Navigator.of(context).pushReplacementNamed('/services');
+                          Navigator.of(
+                            context,
+                          ).pushReplacementNamed('/services');
                         }
                         if (item.title == 'My Applications') {
-                          Navigator.of(context).pushReplacementNamed('/applications');
+                          Navigator.of(
+                            context,
+                          ).pushReplacementNamed('/applications');
                         }
                         if (item.title == 'Payments') {
-                          Navigator.of(context).pushReplacementNamed('/payments');
+                          Navigator.of(
+                            context,
+                          ).pushReplacementNamed('/payments');
                         }
                         if (item.title == 'Notifications') {
-                          Navigator.of(context).pushReplacementNamed('/notifications');
+                          Navigator.of(
+                            context,
+                          ).pushReplacementNamed('/notifications');
                         }
                         if (item.title == 'Settings') {
-                          Navigator.of(context).pushReplacementNamed('/settings');
+                          Navigator.of(
+                            context,
+                          ).pushReplacementNamed('/settings');
                         }
                       },
                     ),
@@ -176,81 +188,225 @@ class _ProfileSidebar extends StatelessWidget {
   }
 }
 
-class _ProfileBody extends StatelessWidget {
+class _ProfileBody extends StatefulWidget {
   const _ProfileBody();
 
   @override
+  State<_ProfileBody> createState() => _ProfileBodyState();
+}
+
+class _ProfileBodyState extends State<_ProfileBody> {
+  final repo = ProfileRepository();
+  Map<String, dynamic>? profile;
+  List<Map<String, dynamic>> docs = [];
+
+  // ================= CONTROLLERS =================
+  final nameController = TextEditingController();
+  final icController = TextEditingController();
+  final phoneController = TextEditingController();
+  final emailController = TextEditingController();
+  final addressController = TextEditingController();
+
+  bool isLoading = true;
+
+  // ================= PRIVACY =================
+  bool lhdn = true;
+  bool kwsp = true;
+  bool padu = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProfile();
+  }
+
+  // ================= LOAD FIREBASE =================
+  Future<void> _loadProfile() async {
+    profile = await repo.getUserProfile();
+    docs = await repo.getUserDocuments();
+
+    nameController.text = profile?['name'] ?? '';
+    icController.text = profile?['ic'] ?? '';
+    phoneController.text = profile?['phone'] ?? '';
+    emailController.text = profile?['email'] ?? '';
+    addressController.text = profile?['address'] ?? '';
+
+    lhdn = profile?['share_lhdn'] ?? true;
+    kwsp = profile?['share_kwsp'] ?? true;
+    padu = profile?['share_padu'] ?? false;
+
+    setState(() => isLoading = false);
+  }
+
+  // ================= SAVE FIREBASE =================
+  Future<void> _saveProfile() async {
+
+    await repo.updateProfile({
+      'name': nameController.text,
+      'ic': icController.text,
+      'phone': phoneController.text,
+      'email': emailController.text,
+      'address': addressController.text,
+      'share_lhdn': lhdn,
+      'share_kwsp': kwsp,
+      'share_padu': padu,
+    });
+
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Profile updated')));
+  }
+
+  // ================= EDIT DIALOG =================
+  void _openEditDialog() {
+    final tempName = TextEditingController(text: nameController.text);
+    final tempIc = TextEditingController(text: icController.text);
+    final tempPhone = TextEditingController(text: phoneController.text);
+    final tempEmail = TextEditingController(text: emailController.text);
+    final tempAddress = TextEditingController(text: addressController.text);
+
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text("Edit Profile"),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _input(tempName, "Full Name"),
+              _input(tempIc, "IC Number"),
+              _input(tempPhone, "Phone"),
+              _input(tempEmail, "Email"),
+              _input(tempAddress, "Address"),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cancel"),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              // ✅ update controllers ONLY after save
+              nameController.text = tempName.text;
+              icController.text = tempIc.text;
+              phoneController.text = tempPhone.text;
+              emailController.text = tempEmail.text;
+              addressController.text = tempAddress.text;
+
+              await _saveProfile();
+
+              Navigator.pop(context);
+              setState(() {});
+            },
+            child: const Text("Save"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _input(TextEditingController c, String label) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: TextField(
+        controller: c,
+        decoration: InputDecoration(labelText: label),
+      ),
+    );
+  }
+
+  // ================= UI =================
+  @override
   Widget build(BuildContext context) {
+    if (isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(20, 14, 18, 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'My Profile',
             style: TextStyle(
-              color: Color(0xFF1E2D3F),
+              color: Theme.of(context).colorScheme.onSurface,
               fontSize: 28,
               fontWeight: FontWeight.w700,
             ),
           ),
+
           const SizedBox(height: 14),
+
+          // ================= PROFILE CARD =================
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: const Color(0xFFF7F8FA),
+              color: Theme.of(context).colorScheme.surface,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: const Color(0xFFD9DEE5)),
             ),
-            child: const Column(
+            child: Column(
               children: [
                 Row(
                   children: [
-                    _AvatarBox(),
-                    SizedBox(width: 12),
+                    const _AvatarBox(),
+                    const SizedBox(width: 12),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Ahmad bin Abdullah',
+                          nameController.text.isEmpty
+                              ? 'No Name'
+                              : nameController.text,
                           style: TextStyle(
-                            color: Color(0xFF1E2D3F),
                             fontSize: 18,
                             fontWeight: FontWeight.w700,
+                            color: Theme.of(context).colorScheme.onSurface,
                           ),
                         ),
-                        SizedBox(height: 2),
                         Text(
-                          'MyKad: 900101-14-5678',
-                          style: TextStyle(
+                          'MyKad: ${icController.text}',
+                          style: const TextStyle(
                             color: Color(0xFF6F8094),
                             fontSize: 13,
-                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ],
                     ),
                   ],
                 ),
-                SizedBox(height: 12),
+
+                const SizedBox(height: 12),
+
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: _openEditDialog,
+                    child: const Text("Edit"),
+                  ),
+                ),
+
                 Row(
                   children: [
                     Expanded(
                       child: _InfoLine(
                         icon: Icons.location_on_outlined,
-                        text: 'No. 12, Jln Bukit Bintang, KL',
+                        text: addressController.text,
                       ),
                     ),
                     Expanded(
                       child: _InfoLine(
                         icon: Icons.phone_outlined,
-                        text: '012-345 6789',
+                        text: phoneController.text,
                       ),
                     ),
                     Expanded(
                       child: _InfoLine(
                         icon: Icons.mail_outline,
-                        text: 'ahmad@email.com',
+                        text: emailController.text,
                       ),
                     ),
                   ],
@@ -258,27 +414,53 @@ class _ProfileBody extends StatelessWidget {
               ],
             ),
           ),
+
           const SizedBox(height: 14),
-          const Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+
+          Row(
             children: [
-              Expanded(child: _DocumentVaultCard()),
-              SizedBox(width: 12),
-              Expanded(child: _LinkedServicesCard()),
+              const Expanded(child: _DocumentVaultCard()),
+              const SizedBox(width: 12),
+              const Expanded(child: _LinkedServicesCard()),
             ],
           ),
+
           const SizedBox(height: 14),
-          const Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+
+          Row(
             children: [
-              Expanded(child: _PaymentHistoryCard()),
-              SizedBox(width: 12),
-              Expanded(child: _PrivacyControlCard()),
+              const Expanded(child: _PaymentHistoryCard()),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _PrivacyControlCard(
+                  lhdn: lhdn,
+                  kwsp: kwsp,
+                  padu: padu,
+                  onChanged: (a, b, c) {
+                    setState(() {
+                      lhdn = a;
+                      kwsp = b;
+                      padu = c;
+                    });
+                    _saveProfile();
+                  },
+                ),
+              ),
             ],
           ),
         ],
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    nameController.dispose();
+    icController.dispose();
+    phoneController.dispose();
+    emailController.dispose();
+    addressController.dispose();
+    super.dispose();
   }
 }
 
@@ -294,7 +476,11 @@ class _AvatarBox extends StatelessWidget {
         color: const Color(0xFFD9DEE5),
         borderRadius: BorderRadius.circular(14),
       ),
-      child: const Icon(Icons.person_outline, size: 34, color: Color(0xFF214B74)),
+      child: const Icon(
+        Icons.person_outline,
+        size: 34,
+        color: Color(0xFF214B74),
+      ),
     );
   }
 }
@@ -327,7 +513,11 @@ class _InfoLine extends StatelessWidget {
 }
 
 class _SectionCard extends StatelessWidget {
-  const _SectionCard({required this.title, required this.icon, required this.child});
+  const _SectionCard({
+    required this.title,
+    required this.icon,
+    required this.child,
+  });
 
   final String title;
   final IconData icon;
@@ -338,7 +528,7 @@ class _SectionCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFFF7F8FA),
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: const Color(0xFFD9DEE5)),
       ),
@@ -351,8 +541,8 @@ class _SectionCard extends StatelessWidget {
               const SizedBox(width: 8),
               Text(
                 title,
-                style: const TextStyle(
-                  color: Color(0xFF1E2D3F),
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurface,
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
                 ),
@@ -405,11 +595,14 @@ class _SimpleListTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: const Color(0xFFEFF2F6),
+        color: theme.brightness == Brightness.dark
+            ? const Color(0xFF273449) // lighter than card
+            : theme.colorScheme.surfaceVariant.withOpacity(0.3),
         borderRadius: BorderRadius.circular(10),
       ),
       child: Column(
@@ -417,8 +610,8 @@ class _SimpleListTile extends StatelessWidget {
         children: [
           Text(
             title,
-            style: const TextStyle(
-              color: Color(0xFF1E2D3F),
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface,
               fontSize: 14,
               fontWeight: FontWeight.w700,
             ),
@@ -450,7 +643,11 @@ class _LinkedServicesCard extends StatelessWidget {
         children: [
           _LinkStatusTile(name: 'Tax Records', agency: 'LHDN', linked: true),
           SizedBox(height: 8),
-          _LinkStatusTile(name: 'EPF Information', agency: 'KWSP', linked: true),
+          _LinkStatusTile(
+            name: 'EPF Information',
+            agency: 'KWSP',
+            linked: true,
+          ),
           SizedBox(height: 8),
           _LinkStatusTile(name: 'Subsidy Data', agency: 'PADU', linked: true),
           SizedBox(height: 8),
@@ -462,7 +659,11 @@ class _LinkedServicesCard extends StatelessWidget {
 }
 
 class _LinkStatusTile extends StatelessWidget {
-  const _LinkStatusTile({required this.name, required this.agency, required this.linked});
+  const _LinkStatusTile({
+    required this.name,
+    required this.agency,
+    required this.linked,
+  });
 
   final String name;
   final String agency;
@@ -470,11 +671,14 @@ class _LinkStatusTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: const Color(0xFFEFF2F6),
+        color: theme.brightness == Brightness.dark
+            ? const Color(0xFF273449) // lighter than card
+            : theme.colorScheme.surfaceVariant.withOpacity(0.3),
         borderRadius: BorderRadius.circular(10),
       ),
       child: Row(
@@ -485,8 +689,8 @@ class _LinkStatusTile extends StatelessWidget {
               children: [
                 Text(
                   name,
-                  style: const TextStyle(
-                    color: Color(0xFF1E2D3F),
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface,
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
                   ),
@@ -512,7 +716,9 @@ class _LinkStatusTile extends StatelessWidget {
             child: Text(
               linked ? 'Linked' : 'Not Linked',
               style: TextStyle(
-                color: linked ? const Color(0xFF2DBE63) : const Color(0xFF7A8B9D),
+                color: linked
+                    ? const Color(0xFF2DBE63)
+                    : const Color(0xFF7A8B9D),
                 fontSize: 11,
                 fontWeight: FontWeight.w700,
               ),
@@ -570,11 +776,14 @@ class _PaymentHistoryTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: const Color(0xFFEFF2F6),
+        color: theme.brightness == Brightness.dark
+            ? const Color(0xFF273449) // lighter than card
+            : theme.colorScheme.surfaceVariant.withOpacity(0.3),
         borderRadius: BorderRadius.circular(10),
       ),
       child: Row(
@@ -582,8 +791,8 @@ class _PaymentHistoryTile extends StatelessWidget {
           Expanded(
             child: Text(
               item,
-              style: const TextStyle(
-                color: Color(0xFF1E2D3F),
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurface,
                 fontSize: 14,
                 fontWeight: FontWeight.w700,
               ),
@@ -594,8 +803,8 @@ class _PaymentHistoryTile extends StatelessWidget {
             children: [
               Text(
                 amount,
-                style: const TextStyle(
-                  color: Color(0xFF1E2D3F),
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurface,
                   fontSize: 14,
                   fontWeight: FontWeight.w700,
                 ),
@@ -618,16 +827,38 @@ class _PaymentHistoryTile extends StatelessWidget {
 }
 
 class _PrivacyControlCard extends StatefulWidget {
-  const _PrivacyControlCard();
+  final bool lhdn;
+  final bool kwsp;
+  final bool padu;
+  final Function(bool, bool, bool) onChanged;
+
+  const _PrivacyControlCard({
+    required this.lhdn,
+    required this.kwsp,
+    required this.padu,
+    required this.onChanged,
+  });
 
   @override
   State<_PrivacyControlCard> createState() => _PrivacyControlCardState();
 }
 
 class _PrivacyControlCardState extends State<_PrivacyControlCard> {
-  bool _lhdn = true;
-  bool _kwsp = true;
-  bool _padu = false;
+  late bool _lhdn;
+  late bool _kwsp;
+  late bool _padu;
+
+  @override
+  void initState() {
+    super.initState();
+    _lhdn = widget.lhdn;
+    _kwsp = widget.kwsp;
+    _padu = widget.padu;
+  }
+
+  void _update() {
+    widget.onChanged(_lhdn, _kwsp, _padu);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -641,9 +872,8 @@ class _PrivacyControlCardState extends State<_PrivacyControlCard> {
             subtitle: 'Tax and income data',
             value: _lhdn,
             onChanged: (value) {
-              setState(() {
-                _lhdn = value;
-              });
+              setState(() => _lhdn = value);
+              _update();
             },
           ),
           const SizedBox(height: 8),
@@ -652,9 +882,8 @@ class _PrivacyControlCardState extends State<_PrivacyControlCard> {
             subtitle: 'Employment and EPF data',
             value: _kwsp,
             onChanged: (value) {
-              setState(() {
-                _kwsp = value;
-              });
+              setState(() => _kwsp = value);
+              _update();
             },
           ),
           const SizedBox(height: 8),
@@ -663,9 +892,8 @@ class _PrivacyControlCardState extends State<_PrivacyControlCard> {
             subtitle: 'Subsidy eligibility data',
             value: _padu,
             onChanged: (value) {
-              setState(() {
-                _padu = value;
-              });
+              setState(() => _padu = value);
+              _update();
             },
           ),
         ],
@@ -675,17 +903,17 @@ class _PrivacyControlCardState extends State<_PrivacyControlCard> {
 }
 
 class _PrivacyRow extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
   const _PrivacyRow({
     required this.title,
     required this.subtitle,
     required this.value,
     required this.onChanged,
   });
-
-  final String title;
-  final String subtitle;
-  final bool value;
-  final ValueChanged<bool> onChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -695,22 +923,10 @@ class _PrivacyRow extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  color: Color(0xFF1E2D3F),
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 2),
+              Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
               Text(
                 subtitle,
-                style: const TextStyle(
-                  color: Color(0xFF6F8094),
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                ),
+                style: const TextStyle(fontSize: 11, color: Color(0xFF6F8094)),
               ),
             ],
           ),
@@ -731,4 +947,38 @@ class _ProfileNavItem {
   final String title;
   final IconData icon;
   final bool active;
+}
+
+class ProfileRepository {
+  final _db = FirebaseFirestore.instance;
+  final _auth = FirebaseAuth.instance;
+
+  Future<Map<String, dynamic>> getUserProfile() async {
+    final uid = _auth.currentUser!.uid;
+
+    final doc = await _db.collection('users').doc(uid).get();
+
+    return doc.data() ?? {};
+  }
+
+  Future<List<Map<String, dynamic>>> getUserDocuments() async {
+    final uid = _auth.currentUser!.uid;
+
+    final snapshot = await _db
+        .collection('users')
+        .doc(uid)
+        .collection('documents')
+        .get();
+
+    return snapshot.docs.map((d) => d.data()).toList();
+  }
+
+  Future<void> updateProfile(Map<String, dynamic> data) async {
+    final uid = _auth.currentUser!.uid;
+
+    await _db.collection('users').doc(uid).set({
+      ...data,
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
 }
