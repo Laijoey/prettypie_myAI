@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'dart:math' as math;
 import 'chat_assistant_fab.dart';
 import 'service.dart';
 import 'application.dart';
@@ -25,6 +24,7 @@ class MyApp extends StatelessWidget {
         useMaterial3: true,
       ),
       routes: {
+        '/login': (_) => const LoginPage(),
         '/dashboard': (_) => const DashboardPage(),
         '/services': (_) => const ServicePage(),
         '/applications': (_) => const ApplicationPage(),
@@ -45,41 +45,28 @@ class LoginPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFEDEDED),
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          final isDesktop = constraints.maxWidth >= 1100;
-          final panelHeight = math.min(760.0, constraints.maxHeight - 24);
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(6),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final isDesktop = constraints.maxWidth >= 1100;
 
-          return Center(
-            child: Container(
-              margin: const EdgeInsets.all(12),
-              constraints: const BoxConstraints(maxWidth: 1700),
-              height: panelHeight,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Color(0x1A000000),
-                    blurRadius: 22,
-                    offset: Offset(0, 8),
-                  ),
-                ],
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: isDesktop
-                  ? const Row(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                return isDesktop
+                    ? const Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           Expanded(flex: 1, child: _BrandPanel()),
                           Expanded(flex: 1, child: _LoginPanel()),
                         ],
                       )
-                    : const _LoginPanel(),
-              ),
+                    : const _LoginPanel();
+              },
             ),
-          );
-        },
+          ),
+        ),
       ),
     );
   }
@@ -192,7 +179,7 @@ class _LoginPanelState extends State<_LoginPanel> {
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 520),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 18),
+              padding: const EdgeInsets.fromLTRB(32, 72, 32, 24),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -720,19 +707,31 @@ class _DashboardSidebar extends StatelessWidget {
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(18, 4, 18, 16),
-            child: Row(
-              children: const [
-                Icon(Icons.logout, color: Color(0xFFC2D1DF)),
-                SizedBox(width: 10),
-                Text(
-                  'Logout',
-                  style: TextStyle(
-                    color: Color(0xFFC2D1DF),
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(10),
+                onTap: () {
+                  Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+                },
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                  child: Row(
+                    children: [
+                      Icon(Icons.logout, color: Color(0xFFC2D1DF)),
+                      SizedBox(width: 10),
+                      Text(
+                        'Logout',
+                        style: TextStyle(
+                          color: Color(0xFFC2D1DF),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ],
+              ),
             ),
           ),
         ],
@@ -1199,18 +1198,22 @@ class _QuickActionsPanel extends StatelessWidget {
                 _QuickActionTile(
                   label: 'Pay Summons',
                   icon: Icons.credit_card_outlined,
+                  onTap: () => openServiceActionPage(context, 'Summons Payment'),
                 ),
                 _QuickActionTile(
                   label: 'Renew License',
                   icon: Icons.badge_outlined,
+                  onTap: () => openServiceActionPage(context, 'License Renewal'),
                 ),
                 _QuickActionTile(
                   label: 'Book Clinic',
                   icon: Icons.event_note_outlined,
+                  onTap: () => openServiceActionPage(context, 'Health Services'),
                 ),
                 _QuickActionTile(
                   label: 'Check Aid',
                   icon: Icons.card_giftcard,
+                  onTap: () => openServiceActionPage(context, 'Welfare Aid (eBantuan)'),
                 ),
               ],
             ),
@@ -1222,41 +1225,48 @@ class _QuickActionsPanel extends StatelessWidget {
 }
 
 class _QuickActionTile extends StatelessWidget {
-  const _QuickActionTile({required this.label, required this.icon});
+  const _QuickActionTile({
+    required this.label,
+    required this.icon,
+    required this.onTap,
+  });
 
   final String label;
   final IconData icon;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFFE9EDF2),
+    return Material(
+      color: const Color(0xFFE9EDF2),
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
         borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 34,
-            height: 34,
-            decoration: BoxDecoration(
-              color: const Color(0xFFD8E0EA),
-              borderRadius: BorderRadius.circular(10),
+        onTap: onTap,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                color: const Color(0xFFD8E0EA),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: const Color(0xFF2D4A68), size: 18),
             ),
-            child: Icon(icon, color: const Color(0xFF2D4A68), size: 18),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            label,
-            style: const TextStyle(
-              color: Color(0xFF2A3E55),
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
+            const SizedBox(height: 6),
+            Text(
+              label,
+              style: const TextStyle(
+                color: Color(0xFF2A3E55),
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+              textAlign: TextAlign.center,
             ),
-            textAlign: TextAlign.center,
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

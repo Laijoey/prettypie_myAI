@@ -153,21 +153,33 @@ class _SettingsSidebar extends StatelessWidget {
               },
             ),
           ),
-          const Padding(
-            padding: EdgeInsets.fromLTRB(18, 4, 18, 16),
-            child: Row(
-              children: [
-                Icon(Icons.logout, color: Color(0xFFC2D1DF)),
-                SizedBox(width: 10),
-                Text(
-                  'Logout',
-                  style: TextStyle(
-                    color: Color(0xFFC2D1DF),
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 4, 18, 16),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(10),
+                onTap: () {
+                  Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+                },
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                  child: Row(
+                    children: [
+                      Icon(Icons.logout, color: Color(0xFFC2D1DF)),
+                      SizedBox(width: 10),
+                      Text(
+                        'Logout',
+                        style: TextStyle(
+                          color: Color(0xFFC2D1DF),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ],
+              ),
             ),
           ),
         ],
@@ -184,6 +196,10 @@ class _SettingsBody extends StatefulWidget {
 }
 
 class _SettingsBodyState extends State<_SettingsBody> {
+  String? _selectedLanguage = 'English (Malaysia)';
+  String? _selectedRegion = 'Kuala Lumpur';
+  String? _selectedAccountType = 'Citizen';
+
   bool _biometricLogin = true;
   bool _emailAlert = true;
   bool _smsAlert = false;
@@ -191,126 +207,183 @@ class _SettingsBodyState extends State<_SettingsBody> {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(20, 14, 18, 14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Settings',
-            style: TextStyle(
-              color: Color(0xFF1E2D3F),
-              fontSize: 28,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 6),
-          const Text(
-            'Manage your account, security, and notification preferences',
-            style: TextStyle(
-              color: Color(0xFF6B7B8D),
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 14),
-          const _SettingsSectionTitle('Account'),
-          const SizedBox(height: 10),
-          _SettingsCard(
-            children: const [
-              _InfoRow(label: 'Preferred Language', value: 'English (Malaysia)'),
-              _InfoRow(label: 'Region', value: 'Kuala Lumpur'),
-              _InfoRow(label: 'Account Type', value: 'Citizen'),
-            ],
-          ),
-          const SizedBox(height: 14),
-          const _SettingsSectionTitle('Security'),
-          const SizedBox(height: 10),
-          _SettingsCard(
-            children: [
-              _ToggleRow(
-                title: 'Biometric Login',
-                subtitle: 'Use fingerprint or face ID for sign in',
-                value: _biometricLogin,
-                onChanged: (value) {
-                  setState(() {
-                    _biometricLogin = value;
-                  });
-                },
-              ),
-              const Divider(height: 1, color: Color(0xFFDDE3EA)),
-              const _ActionRow(
-                title: 'Change Password',
-                subtitle: 'Update your account password',
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          const _SettingsSectionTitle('Notifications'),
-          const SizedBox(height: 10),
-          _SettingsCard(
-            children: [
-              _ToggleRow(
-                title: 'Email Alerts',
-                subtitle: 'Get important updates by email',
-                value: _emailAlert,
-                onChanged: (value) {
-                  setState(() {
-                    _emailAlert = value;
-                  });
-                },
-              ),
-              const Divider(height: 1, color: Color(0xFFDDE3EA)),
-              _ToggleRow(
-                title: 'SMS Alerts',
-                subtitle: 'Receive reminders via SMS',
-                value: _smsAlert,
-                onChanged: (value) {
-                  setState(() {
-                    _smsAlert = value;
-                  });
-                },
-              ),
-              const Divider(height: 1, color: Color(0xFFDDE3EA)),
-              _ToggleRow(
-                title: 'Dark Mode',
-                subtitle: 'Enable darker interface theme',
-                value: _darkMode,
-                onChanged: (value) {
-                  setState(() {
-                    _darkMode = value;
-                  });
-                },
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          SizedBox(
-            width: 180,
-            height: 44,
-            child: FilledButton(
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Settings saved successfully.'),
-                    behavior: SnackBarBehavior.floating,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 14, 18, 14),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight - 28),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Settings',
+                  style: TextStyle(
+                    color: Color(0xFF1E2D3F),
+                    fontSize: 28,
+                    fontWeight: FontWeight.w700,
                   ),
-                );
-              },
-              style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFF1F4468),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
                 ),
-              ),
-              child: const Text(
-                'Save Changes',
-                style: TextStyle(fontWeight: FontWeight.w700),
-              ),
+                const SizedBox(height: 6),
+                const Text(
+                  'Manage your account, security, and notification preferences',
+                  style: TextStyle(
+                    color: Color(0xFF6B7B8D),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                const _SettingsSectionTitle('Account'),
+                const SizedBox(height: 10),
+                _SettingsCard(
+                  children: [
+                    _SelectRow(
+                      label: 'Preferred Language',
+                      value: _selectedLanguage,
+                      fallbackValue: 'English (Malaysia)',
+                      options: const [
+                        'English (Malaysia)',
+                        'Bahasa Melayu',
+                        'English (US)',
+                        'Chinese',
+                        'Tamil',
+                      ],
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedLanguage = value;
+                        });
+                      },
+                    ),
+                    const Divider(height: 1, color: Color(0xFFDDE3EA)),
+                    _SelectRow(
+                      label: 'Region',
+                      value: _selectedRegion,
+                      fallbackValue: 'Kuala Lumpur',
+                      options: const [
+                        'Kuala Lumpur',
+                        'Selangor',
+                        'Johor',
+                        'Penang',
+                        'Sabah',
+                        'Sarawak',
+                      ],
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedRegion = value;
+                        });
+                      },
+                    ),
+                    const Divider(height: 1, color: Color(0xFFDDE3EA)),
+                    _SelectRow(
+                      label: 'Account Type',
+                      value: _selectedAccountType,
+                      fallbackValue: 'Citizen',
+                      options: const [
+                        'Citizen',
+                        'Permanent Resident',
+                        'Foreigner',
+                        'Business',
+                      ],
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedAccountType = value;
+                        });
+                      },
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                const _SettingsSectionTitle('Security'),
+                const SizedBox(height: 10),
+                _SettingsCard(
+                  children: [
+                    _ToggleRow(
+                      title: 'Biometric Login',
+                      subtitle: 'Use fingerprint or face ID for sign in',
+                      value: _biometricLogin,
+                      onChanged: (value) {
+                        setState(() {
+                          _biometricLogin = value;
+                        });
+                      },
+                    ),
+                    const Divider(height: 1, color: Color(0xFFDDE3EA)),
+                    const _ActionRow(
+                      title: 'Change Password',
+                      subtitle: 'Update your account password',
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                const _SettingsSectionTitle('Notifications'),
+                const SizedBox(height: 10),
+                _SettingsCard(
+                  children: [
+                    _ToggleRow(
+                      title: 'Email Alerts',
+                      subtitle: 'Get important updates by email',
+                      value: _emailAlert,
+                      onChanged: (value) {
+                        setState(() {
+                          _emailAlert = value;
+                        });
+                      },
+                    ),
+                    const Divider(height: 1, color: Color(0xFFDDE3EA)),
+                    _ToggleRow(
+                      title: 'SMS Alerts',
+                      subtitle: 'Receive reminders via SMS',
+                      value: _smsAlert,
+                      onChanged: (value) {
+                        setState(() {
+                          _smsAlert = value;
+                        });
+                      },
+                    ),
+                    const Divider(height: 1, color: Color(0xFFDDE3EA)),
+                    _ToggleRow(
+                      title: 'Dark Mode',
+                      subtitle: 'Enable darker interface theme',
+                      value: _darkMode,
+                      onChanged: (value) {
+                        setState(() {
+                          _darkMode = value;
+                        });
+                      },
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: 180,
+                  height: 44,
+                  child: FilledButton(
+                    onPressed: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Settings saved successfully.'),
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                    },
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFF1F4468),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text(
+                      'Save Changes',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
@@ -351,16 +424,27 @@ class _SettingsCard extends StatelessWidget {
   }
 }
 
-class _InfoRow extends StatelessWidget {
-  const _InfoRow({required this.label, required this.value});
+class _SelectRow extends StatelessWidget {
+  const _SelectRow({
+    required this.label,
+    required this.value,
+    required this.fallbackValue,
+    required this.options,
+    required this.onChanged,
+  });
 
   final String label;
-  final String value;
+  final String? value;
+  final String fallbackValue;
+  final List<String> options;
+  final ValueChanged<String> onChanged;
 
   @override
   Widget build(BuildContext context) {
+    final selectedValue = (value != null && options.contains(value)) ? value! : fallbackValue;
+
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       child: Row(
         children: [
           Expanded(
@@ -373,12 +457,33 @@ class _InfoRow extends StatelessWidget {
               ),
             ),
           ),
-          Text(
-            value,
-            style: const TextStyle(
-              color: Color(0xFF1E2D3F),
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
+          SizedBox(
+            width: 220,
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String>(
+                value: selectedValue,
+                isExpanded: true,
+                alignment: Alignment.centerRight,
+                style: const TextStyle(
+                  color: Color(0xFF1E2D3F),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                ),
+                items: options
+                    .map(
+                      (option) => DropdownMenuItem<String>(
+                        value: option,
+                        child: Text(option),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (value) {
+                  if (value == null) {
+                    return;
+                  }
+                  onChanged(value);
+                },
+              ),
             ),
           ),
         ],

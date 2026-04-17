@@ -14,7 +14,7 @@ class ProfilePage extends StatelessWidget {
           child: ClipRRect(
             borderRadius: BorderRadius.circular(12),
             child: Row(
-              children: const [
+              children: [
                 SizedBox(
                   width: 220,
                   child: _ProfileSidebar(),
@@ -153,21 +153,33 @@ class _ProfileSidebar extends StatelessWidget {
               },
             ),
           ),
-          const Padding(
-            padding: EdgeInsets.fromLTRB(18, 4, 18, 16),
-            child: Row(
-              children: [
-                Icon(Icons.logout, color: Color(0xFFC2D1DF)),
-                SizedBox(width: 10),
-                Text(
-                  'Logout',
-                  style: TextStyle(
-                    color: Color(0xFFC2D1DF),
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 4, 18, 16),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(10),
+                onTap: () {
+                  Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+                },
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                  child: Row(
+                    children: [
+                      Icon(Icons.logout, color: Color(0xFFC2D1DF)),
+                      SizedBox(width: 10),
+                      Text(
+                        'Logout',
+                        style: TextStyle(
+                          color: Color(0xFFC2D1DF),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ],
+              ),
             ),
           ),
         ],
@@ -176,8 +188,255 @@ class _ProfileSidebar extends StatelessWidget {
   }
 }
 
-class _ProfileBody extends StatelessWidget {
+class _ProfileBody extends StatefulWidget {
   const _ProfileBody();
+
+  @override
+  State<_ProfileBody> createState() => _ProfileBodyState();
+}
+
+class _ProfileBodyState extends State<_ProfileBody> {
+  _UserProfile _profile = const _UserProfile(
+    fullName: 'Ahmad bin Abdullah',
+    myKad: '900101-14-5678',
+    address: 'No. 12, Jln Bukit Bintang, KL',
+    phone: '012-345 6789',
+    email: 'ahmad@email.com',
+  );
+
+  final List<_StoredDocument> _documents = [
+    const _StoredDocument(
+      title: 'Identity Card (MyKad)',
+      category: 'ID',
+      uploadedDate: '01 Jan 2025',
+    ),
+    const _StoredDocument(
+      title: 'Income Statement 2024',
+      category: 'Finance',
+      uploadedDate: '15 Mar 2025',
+    ),
+    const _StoredDocument(
+      title: 'SPM Certificate',
+      category: 'Education',
+      uploadedDate: '20 Jun 2023',
+    ),
+  ];
+
+  Future<void> _showEditProfileDialog() async {
+    final nameController = TextEditingController(text: _profile.fullName);
+    final myKadController = TextEditingController(text: _profile.myKad);
+    final addressController = TextEditingController(text: _profile.address);
+    final phoneController = TextEditingController(text: _profile.phone);
+    final emailController = TextEditingController(text: _profile.email);
+
+    await showDialog<void>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Edit Personal Profile'),
+          content: SizedBox(
+            width: 460,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildDialogField('Full Name', nameController),
+                  const SizedBox(height: 10),
+                  _buildDialogField('MyKad Number', myKadController),
+                  const SizedBox(height: 10),
+                  _buildDialogField('Address', addressController, maxLines: 2),
+                  const SizedBox(height: 10),
+                  _buildDialogField('Phone Number', phoneController),
+                  const SizedBox(height: 10),
+                  _buildDialogField(
+                    'Email Address',
+                    emailController,
+                    keyboardType: TextInputType.emailAddress,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final email = emailController.text.trim();
+                if (nameController.text.trim().isEmpty ||
+                    myKadController.text.trim().isEmpty ||
+                    addressController.text.trim().isEmpty ||
+                    phoneController.text.trim().isEmpty ||
+                    email.isEmpty) {
+                  ScaffoldMessenger.of(this.context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Please fill in all profile fields.'),
+                    ),
+                  );
+                  return;
+                }
+
+                final emailPattern = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
+                if (!emailPattern.hasMatch(email)) {
+                  ScaffoldMessenger.of(this.context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Please enter a valid email address.'),
+                    ),
+                  );
+                  return;
+                }
+
+                setState(() {
+                  _profile = _UserProfile(
+                    fullName: nameController.text.trim(),
+                    myKad: myKadController.text.trim(),
+                    address: addressController.text.trim(),
+                    phone: phoneController.text.trim(),
+                    email: email,
+                  );
+                });
+
+                Navigator.of(context).pop();
+                ScaffoldMessenger.of(this.context).showSnackBar(
+                  const SnackBar(content: Text('Profile updated successfully.')),
+                );
+              },
+              child: const Text('Save Changes'),
+            ),
+          ],
+        );
+      },
+    );
+
+    nameController.dispose();
+    myKadController.dispose();
+    addressController.dispose();
+    phoneController.dispose();
+    emailController.dispose();
+  }
+
+  Future<void> _showUploadDocumentDialog() async {
+    String? selectedCategory;
+    final categories = ['ID', 'Finance', 'Education', 'Health', 'Other'];
+
+    await showDialog<void>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Upload Document'),
+              content: SizedBox(
+                width: 420,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    DropdownButtonFormField<String>(
+                      initialValue: selectedCategory,
+                      decoration: const InputDecoration(
+                        labelText: 'Choose Category',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: categories
+                          .map(
+                            (category) => DropdownMenuItem<String>(
+                              value: category,
+                              child: Text(category),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (value) {
+                        setDialogState(() {
+                          selectedCategory = value;
+                        });
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton.icon(
+                  onPressed: () {
+                    if (selectedCategory == null) {
+                      ScaffoldMessenger.of(this.context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Please choose a category.'),
+                        ),
+                      );
+                      return;
+                    }
+
+                    final now = DateTime.now();
+                    final generatedTitle =
+                        'Document_${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}_${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}${now.second.toString().padLeft(2, '0')}.pdf';
+
+                    setState(() {
+                      _documents.insert(
+                        0,
+                        _StoredDocument(
+                          title: generatedTitle,
+                          category: selectedCategory!,
+                          uploadedDate: _formatDate(now),
+                        ),
+                      );
+                    });
+
+                    Navigator.of(context).pop();
+                    ScaffoldMessenger.of(this.context).showSnackBar(
+                      const SnackBar(content: Text('Document uploaded and stored.')),
+                    );
+                  },
+                  icon: const Icon(Icons.upload_file_outlined),
+                  label: const Text('Upload Document'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  String _formatDate(DateTime dateTime) {
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    return '${dateTime.day.toString().padLeft(2, '0')} ${months[dateTime.month - 1]} ${dateTime.year}';
+  }
+
+  Widget _buildDialogField(
+    String label,
+    TextEditingController controller, {
+    int maxLines = 1,
+    TextInputType keyboardType = TextInputType.text,
+  }) {
+    return TextField(
+      controller: controller,
+      maxLines: maxLines,
+      keyboardType: keyboardType,
+      decoration: InputDecoration(
+        labelText: label,
+        border: const OutlineInputBorder(),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -202,55 +461,62 @@ class _ProfileBody extends StatelessWidget {
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: const Color(0xFFD9DEE5)),
             ),
-            child: const Column(
+            child: Column(
               children: [
                 Row(
                   children: [
-                    _AvatarBox(),
-                    SizedBox(width: 12),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Ahmad bin Abdullah',
-                          style: TextStyle(
-                            color: Color(0xFF1E2D3F),
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
+                    const _AvatarBox(),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _profile.fullName,
+                            style: const TextStyle(
+                              color: Color(0xFF1E2D3F),
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
-                        ),
-                        SizedBox(height: 2),
-                        Text(
-                          'MyKad: 900101-14-5678',
-                          style: TextStyle(
-                            color: Color(0xFF6F8094),
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
+                          const SizedBox(height: 2),
+                          Text(
+                            'MyKad: ${_profile.myKad}',
+                            style: const TextStyle(
+                              color: Color(0xFF6F8094),
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: _showEditProfileDialog,
+                      icon: const Icon(Icons.edit_outlined, size: 18),
+                      label: const Text('Edit Profile'),
                     ),
                   ],
                 ),
-                SizedBox(height: 12),
+                const SizedBox(height: 12),
                 Row(
                   children: [
                     Expanded(
                       child: _InfoLine(
                         icon: Icons.location_on_outlined,
-                        text: 'No. 12, Jln Bukit Bintang, KL',
+                        text: _profile.address,
                       ),
                     ),
                     Expanded(
                       child: _InfoLine(
                         icon: Icons.phone_outlined,
-                        text: '012-345 6789',
+                        text: _profile.phone,
                       ),
                     ),
                     Expanded(
                       child: _InfoLine(
                         icon: Icons.mail_outline,
-                        text: 'ahmad@email.com',
+                        text: _profile.email,
                       ),
                     ),
                   ],
@@ -259,12 +525,17 @@ class _ProfileBody extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 14),
-          const Row(
+          Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(child: _DocumentVaultCard()),
-              SizedBox(width: 12),
-              Expanded(child: _LinkedServicesCard()),
+              Expanded(
+                child: _DocumentVaultCard(
+                  documents: _documents,
+                  onUploadPressed: _showUploadDocumentDialog,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(child: _LinkedServicesCard()),
             ],
           ),
           const SizedBox(height: 14),
@@ -327,11 +598,17 @@ class _InfoLine extends StatelessWidget {
 }
 
 class _SectionCard extends StatelessWidget {
-  const _SectionCard({required this.title, required this.icon, required this.child});
+  const _SectionCard({
+    required this.title,
+    required this.icon,
+    required this.child,
+    this.action,
+  });
 
   final String title;
   final IconData icon;
   final Widget child;
+  final Widget? action;
 
   @override
   Widget build(BuildContext context) {
@@ -357,6 +634,8 @@ class _SectionCard extends StatelessWidget {
                   fontWeight: FontWeight.w700,
                 ),
               ),
+              const Spacer(),
+              if (action != null) action!,
             ],
           ),
           const SizedBox(height: 10),
@@ -368,33 +647,67 @@ class _SectionCard extends StatelessWidget {
 }
 
 class _DocumentVaultCard extends StatelessWidget {
-  const _DocumentVaultCard();
+  const _DocumentVaultCard({
+    required this.documents,
+    required this.onUploadPressed,
+  });
+
+  final List<_StoredDocument> documents;
+  final VoidCallback onUploadPressed;
 
   @override
   Widget build(BuildContext context) {
-    return const _SectionCard(
+    return _SectionCard(
       title: 'Document Vault',
       icon: Icons.description_outlined,
+      action: FilledButton.tonalIcon(
+        onPressed: onUploadPressed,
+        icon: const Icon(Icons.upload_file_outlined, size: 16),
+        label: const Text('Upload'),
+      ),
       child: Column(
-        children: [
-          _SimpleListTile(
-            title: 'Identity Card (MyKad)',
-            subtitle: 'ID - Uploaded 01 Jan 2025',
-          ),
-          SizedBox(height: 8),
-          _SimpleListTile(
-            title: 'Income Statement 2024',
-            subtitle: 'Finance - Uploaded 15 Mar 2025',
-          ),
-          SizedBox(height: 8),
-          _SimpleListTile(
-            title: 'SPM Certificate',
-            subtitle: 'Education - Uploaded 20 Jun 2023',
-          ),
-        ],
+        children: documents
+            .map(
+              (document) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: _SimpleListTile(
+                  title: document.title,
+                  subtitle: '${document.category} - Uploaded ${document.uploadedDate}',
+                ),
+              ),
+            )
+            .toList(),
       ),
     );
   }
+}
+
+class _UserProfile {
+  const _UserProfile({
+    required this.fullName,
+    required this.myKad,
+    required this.address,
+    required this.phone,
+    required this.email,
+  });
+
+  final String fullName;
+  final String myKad;
+  final String address;
+  final String phone;
+  final String email;
+}
+
+class _StoredDocument {
+  const _StoredDocument({
+    required this.title,
+    required this.category,
+    required this.uploadedDate,
+  });
+
+  final String title;
+  final String category;
+  final String uploadedDate;
 }
 
 class _SimpleListTile extends StatelessWidget {

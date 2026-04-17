@@ -153,21 +153,33 @@ class _ApplicationSidebar extends StatelessWidget {
               },
             ),
           ),
-          const Padding(
-            padding: EdgeInsets.fromLTRB(18, 4, 18, 16),
-            child: Row(
-              children: [
-                Icon(Icons.logout, color: Color(0xFFC2D1DF)),
-                SizedBox(width: 10),
-                Text(
-                  'Logout',
-                  style: TextStyle(
-                    color: Color(0xFFC2D1DF),
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 4, 18, 16),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(10),
+                onTap: () {
+                  Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+                },
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                  child: Row(
+                    children: [
+                      Icon(Icons.logout, color: Color(0xFFC2D1DF)),
+                      SizedBox(width: 10),
+                      Text(
+                        'Logout',
+                        style: TextStyle(
+                          color: Color(0xFFC2D1DF),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ],
+              ),
             ),
           ),
         ],
@@ -405,10 +417,12 @@ class _SuggestionGrid extends StatelessWidget {
           title: 'You are eligible for STR',
           subtitle:
               'Based on your income data, you qualify for Sumbangan Tunai Rahmah.',
+          imageAsset: 'assets/images/STR.webp',
         ),
         _SuggestionTile(
           title: 'Apply for MyKasih',
           subtitle: 'Your household profile matches the MyKasih food aid criteria.',
+          imageAsset: 'assets/images/MYKASIH.webp',
         ),
       ],
     );
@@ -416,10 +430,15 @@ class _SuggestionGrid extends StatelessWidget {
 }
 
 class _SuggestionTile extends StatelessWidget {
-  const _SuggestionTile({required this.title, required this.subtitle});
+  const _SuggestionTile({
+    required this.title,
+    required this.subtitle,
+    this.imageAsset,
+  });
 
   final String title;
   final String subtitle;
+  final String? imageAsset;
 
   @override
   Widget build(BuildContext context) {
@@ -432,8 +451,20 @@ class _SuggestionTile extends StatelessWidget {
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.center,
         children: [
+          if (imageAsset != null)
+            ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: SizedBox(
+                height: 170,
+                width: double.infinity,
+                child: Image.asset(
+                  imageAsset!,
+                  fit: BoxFit.cover,
+                ),
+              ),
+            ),
+          if (imageAsset != null) const SizedBox(height: 12),
           Text(
             title,
             style: const TextStyle(
