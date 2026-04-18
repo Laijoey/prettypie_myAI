@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'chat_assistant_fab.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class NotificationPage extends StatelessWidget {
   const NotificationPage({super.key});
@@ -8,7 +9,7 @@ class NotificationPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor, 
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(6),
@@ -16,10 +17,7 @@ class NotificationPage extends StatelessWidget {
             borderRadius: BorderRadius.circular(12),
             child: Row(
               children: [
-                SizedBox(
-                  width: 220,
-                  child: _NotificationSidebar(),
-                ),
+                SizedBox(width: 220, child: _NotificationSidebar()),
                 Expanded(
                   child: ColoredBox(
                     color: theme.scaffoldBackgroundColor,
@@ -43,8 +41,16 @@ class _NotificationSidebar extends StatelessWidget {
     _NotificationNavItem('Dashboard', Icons.dashboard_outlined, false),
     _NotificationNavItem('Services', Icons.grid_view_outlined, false),
     _NotificationNavItem('My Applications', Icons.description_outlined, false),
-    _NotificationNavItem('Payments', Icons.account_balance_wallet_outlined, false),
-    _NotificationNavItem('Notifications', Icons.notifications_none_outlined, true),
+    _NotificationNavItem(
+      'Payments',
+      Icons.account_balance_wallet_outlined,
+      false,
+    ),
+    _NotificationNavItem(
+      'Notifications',
+      Icons.notifications_none_outlined,
+      true,
+    ),
     _NotificationNavItem('Profile', Icons.person_outline, false),
     _NotificationNavItem('Settings', Icons.settings_outlined, false),
   ];
@@ -130,22 +136,34 @@ class _NotificationSidebar extends StatelessWidget {
                       ),
                       onTap: () {
                         if (item.title == 'Dashboard') {
-                          Navigator.of(context).pushReplacementNamed('/dashboard');
+                          Navigator.of(
+                            context,
+                          ).pushReplacementNamed('/dashboard');
                         }
                         if (item.title == 'Services') {
-                          Navigator.of(context).pushReplacementNamed('/services');
+                          Navigator.of(
+                            context,
+                          ).pushReplacementNamed('/services');
                         }
                         if (item.title == 'My Applications') {
-                          Navigator.of(context).pushReplacementNamed('/applications');
+                          Navigator.of(
+                            context,
+                          ).pushReplacementNamed('/applications');
                         }
                         if (item.title == 'Payments') {
-                          Navigator.of(context).pushReplacementNamed('/payments');
+                          Navigator.of(
+                            context,
+                          ).pushReplacementNamed('/payments');
                         }
                         if (item.title == 'Profile') {
-                          Navigator.of(context).pushReplacementNamed('/profile');
+                          Navigator.of(
+                            context,
+                          ).pushReplacementNamed('/profile');
                         }
                         if (item.title == 'Settings') {
-                          Navigator.of(context).pushReplacementNamed('/settings');
+                          Navigator.of(
+                            context,
+                          ).pushReplacementNamed('/settings');
                         }
                       },
                     ),
@@ -154,21 +172,31 @@ class _NotificationSidebar extends StatelessWidget {
               },
             ),
           ),
-          const Padding(
-            padding: EdgeInsets.fromLTRB(18, 4, 18, 16),
-            child: Row(
-              children: [
-                Icon(Icons.logout, color: Color(0xFFC2D1DF)),
-                SizedBox(width: 10),
-                Text(
-                  'Logout',
-                  style: TextStyle(
-                    color: Color(0xFFC2D1DF),
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 4, 18, 16),
+            child: InkWell(
+              onTap: () async {
+                await FirebaseAuth.instance.signOut();
+
+                // IMPORTANT: clear navigation stack
+                Navigator.of(
+                  context,
+                ).pushNamedAndRemoveUntil('/login', (route) => false);
+              },
+              child: const Row(
+                children: [
+                  Icon(Icons.logout, color: Color(0xFFC2D1DF)),
+                  SizedBox(width: 10),
+                  Text(
+                    'Logout',
+                    style: TextStyle(
+                      color: Color(0xFFC2D1DF),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ],
@@ -247,8 +275,8 @@ class _NotificationBodyState extends State<_NotificationBody> {
     final visibleNotifications = _selectedFilter == 'All'
         ? _allNotifications
         : _allNotifications
-            .where((item) => item.category == _selectedFilter)
-            .toList();
+              .where((item) => item.category == _selectedFilter)
+              .toList();
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -387,7 +415,7 @@ class _NotificationListCard extends StatelessWidget {
       ),
       child: Column(
         children: items.isEmpty
-            ?[
+            ? [
                 Padding(
                   padding: EdgeInsets.symmetric(horizontal: 14, vertical: 20),
                   child: Align(

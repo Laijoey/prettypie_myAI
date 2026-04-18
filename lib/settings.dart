@@ -8,45 +8,42 @@ class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
 
   @override
-Widget build(BuildContext context) {
-  final theme = Theme.of(context);
-  final isDark = theme.brightness == Brightness.dark;
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
-  return Scaffold(
-    backgroundColor: theme.scaffoldBackgroundColor,
+    return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
 
-    // ✅ MUST BE HERE (outside body)
-    floatingActionButton: const ChatAssistantFab(),
+      // ✅ MUST BE HERE (outside body)
+      floatingActionButton: const ChatAssistantFab(),
 
-    body: SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.all(6),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: Row(
-            children: [
-              // ================= SIDEBAR =================
-              const SizedBox(
-                width: 220,
-                child: _SettingsSidebar(),
-              ),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(6),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Row(
+              children: [
+                // ================= SIDEBAR =================
+                const SizedBox(width: 220, child: _SettingsSidebar()),
 
-              // ================= MAIN CONTENT =================
-              Expanded(
-                child: ColoredBox(
-                  color: isDark
-                      ? theme.scaffoldBackgroundColor
-                      : const Color(0xFFF5F5F7),
-                  child: const _SettingsBody(),
+                // ================= MAIN CONTENT =================
+                Expanded(
+                  child: ColoredBox(
+                    color: isDark
+                        ? theme.scaffoldBackgroundColor
+                        : const Color(0xFFF5F5F7),
+                    child: const _SettingsBody(),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
-    ),
-  );
-}
+    );
+  }
 }
 
 class _SettingsSidebar extends StatelessWidget {
@@ -143,22 +140,34 @@ class _SettingsSidebar extends StatelessWidget {
                       ),
                       onTap: () {
                         if (item.title == 'Dashboard') {
-                          Navigator.of(context).pushReplacementNamed('/dashboard');
+                          Navigator.of(
+                            context,
+                          ).pushReplacementNamed('/dashboard');
                         }
                         if (item.title == 'Services') {
-                          Navigator.of(context).pushReplacementNamed('/services');
+                          Navigator.of(
+                            context,
+                          ).pushReplacementNamed('/services');
                         }
                         if (item.title == 'My Applications') {
-                          Navigator.of(context).pushReplacementNamed('/applications');
+                          Navigator.of(
+                            context,
+                          ).pushReplacementNamed('/applications');
                         }
                         if (item.title == 'Payments') {
-                          Navigator.of(context).pushReplacementNamed('/payments');
+                          Navigator.of(
+                            context,
+                          ).pushReplacementNamed('/payments');
                         }
                         if (item.title == 'Notifications') {
-                          Navigator.of(context).pushReplacementNamed('/notifications');
+                          Navigator.of(
+                            context,
+                          ).pushReplacementNamed('/notifications');
                         }
                         if (item.title == 'Profile') {
-                          Navigator.of(context).pushReplacementNamed('/profile');
+                          Navigator.of(
+                            context,
+                          ).pushReplacementNamed('/profile');
                         }
                       },
                     ),
@@ -167,21 +176,31 @@ class _SettingsSidebar extends StatelessWidget {
               },
             ),
           ),
-          const Padding(
-            padding: EdgeInsets.fromLTRB(18, 4, 18, 16),
-            child: Row(
-              children: [
-                Icon(Icons.logout, color: Color(0xFFC2D1DF)),
-                SizedBox(width: 10),
-                Text(
-                  'Logout',
-                  style: TextStyle(
-                    color: Color(0xFFC2D1DF),
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 4, 18, 16),
+            child: InkWell(
+              onTap: () async {
+                await FirebaseAuth.instance.signOut();
+
+                // IMPORTANT: clear navigation stack
+                Navigator.of(
+                  context,
+                ).pushNamedAndRemoveUntil('/login', (route) => false);
+              },
+              child: const Row(
+                children: [
+                  Icon(Icons.logout, color: Color(0xFFC2D1DF)),
+                  SizedBox(width: 10),
+                  Text(
+                    'Logout',
+                    style: TextStyle(
+                      color: Color(0xFFC2D1DF),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ],
@@ -198,7 +217,7 @@ class _SettingsBody extends StatefulWidget {
 }
 
 class _SettingsBodyState extends State<_SettingsBody> {
-  final _uid = FirebaseAuth.instance.currentUser!.uid;
+  String? _uid;
 
   // ================= STATE =================
   bool _biometricLogin = true;
@@ -214,7 +233,7 @@ class _SettingsBodyState extends State<_SettingsBody> {
   final List<String> _languages = [
     'English (Malaysia)',
     'Bahasa Melayu',
-    'Chinese'
+    'Chinese',
   ];
 
   final List<String> _regions = [
@@ -242,69 +261,90 @@ class _SettingsBodyState extends State<_SettingsBody> {
     _loadSettings();
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Grab the ID we passed from the Login Panel
+    final String? args = ModalRoute.of(context)?.settings.arguments as String?;
+    // Use passed ID, or fallback to Firebase Auth, or fallback to Kelvin
+    _uid =
+        args ??
+        FirebaseAuth.instance.currentUser?.uid ??
+        "QkP13R7eWNUB2yeLlJUBFqVXBHv2";
+  }
+
   // ================= LOAD =================
   Future<void> _loadSettings() async {
-  try {
-    final user = FirebaseAuth.instance.currentUser;
+    try {
+      // 1. Try to get UID from navigation arguments first (The QR Demo path)
+      String? passedUid = ModalRoute.of(context)?.settings.arguments as String?;
 
-    if (user == null) {
+      // 2. Fallback to Firebase Auth (The Manual login path)
+      String? authUid = FirebaseAuth.instance.currentUser?.uid;
+
+      final finalUid = authUid ?? passedUid;
+
+      if (finalUid == null) {
+        print("ERROR: No User ID found from Auth or Navigation");
+        setState(() => _loading = false);
+        return;
+      }
+
+      // 3. Fetch from Firestore using the winner
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(finalUid)
+          .get();
+
+      if (doc.exists) {
+        final data = doc.data()!;
+        final theme = Provider.of<ThemeController>(context, listen: false);
+
+        setState(() {
+          _biometricLogin = data['biometric'] ?? true;
+          _emailAlert = data['emailAlert'] ?? true;
+          _smsAlert = data['smsAlert'] ?? false;
+          _darkMode = data['darkMode'] ?? false;
+          _language = data['language'] ?? _language;
+          _region = data['region'] ?? _region;
+        });
+
+        theme.setDarkMode(data['darkMode'] ?? false);
+      }
+    } catch (e) {
+      print("ERROR LOADING SETTINGS: $e");
+    } finally {
       setState(() => _loading = false);
-      return;
     }
-
-    final doc = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(user.uid)
-        .get();
-
-    if (doc.exists) {
-      final data = doc.data()!;
-
-      final theme = Provider.of<ThemeController>(
-        context,
-        listen: false,
-      );
-
-      setState(() {
-        _biometricLogin = data['biometric'] ?? true;
-        _emailAlert = data['emailAlert'] ?? true;
-        _smsAlert = data['smsAlert'] ?? false;
-        _darkMode = data['darkMode'] ?? false;
-        _language = data['language'] ?? _language;
-        _region = data['region'] ?? _region;
-      });
-
-      // ✅ APPLY DARK MODE HERE (after data exists)
-      theme.setDarkMode(data['darkMode'] ?? false);
-    }
-  } catch (e) {
-    print("ERROR: $e");
-  } finally {
-    setState(() => _loading = false);
   }
-}
 
   // ================= SAVE =================
   Future<void> _saveSettings() async {
-  final user = FirebaseAuth.instance.currentUser;
-  if (user == null) return;
+    final authUid = FirebaseAuth.instance.currentUser?.uid;
+    final passedUid = ModalRoute.of(context)?.settings.arguments as String?;
 
-  await FirebaseFirestore.instance
-      .collection('users')
-      .doc(user.uid)
-      .set({
-    'biometric': _biometricLogin,
-    'emailAlert': _emailAlert,
-    'smsAlert': _smsAlert,
-    'darkMode': _darkMode,
-    'language': _language,
-    'region': _region,
-  }, SetOptions(merge: true)); // ✅ IMPORTANT
+    final finalUid = authUid ?? passedUid;
 
-  ScaffoldMessenger.of(context).showSnackBar(
-    const SnackBar(content: Text('Settings saved')),
-  );
-}
+    if (finalUid == null) {
+      print("❌ NO UID — user not logged in or not passed");
+      return;
+    }
+
+    if (finalUid == null) return;
+
+    await FirebaseFirestore.instance.collection('users').doc(finalUid).set({
+      'biometric': _biometricLogin,
+      'emailAlert': _emailAlert,
+      'smsAlert': _smsAlert,
+      'darkMode': _darkMode,
+      'language': _language,
+      'region': _region,
+    }, SetOptions(merge: true)); // keep merge
+
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Settings saved')));
+  }
 
   // ================= CHANGE PASSWORD =================
   Future<void> _changePasswordDialog() async {
@@ -317,9 +357,7 @@ class _SettingsBodyState extends State<_SettingsBody> {
         content: TextField(
           controller: controller,
           obscureText: true,
-          decoration: const InputDecoration(
-            hintText: "Enter new password",
-          ),
+          decoration: const InputDecoration(hintText: "Enter new password"),
         ),
         actions: [
           TextButton(
@@ -329,8 +367,9 @@ class _SettingsBodyState extends State<_SettingsBody> {
           ElevatedButton(
             onPressed: () async {
               try {
-                await FirebaseAuth.instance.currentUser!
-                    .updatePassword(controller.text);
+                await FirebaseAuth.instance.currentUser!.updatePassword(
+                  controller.text,
+                );
 
                 Navigator.pop(context);
 
@@ -338,13 +377,13 @@ class _SettingsBodyState extends State<_SettingsBody> {
                   const SnackBar(content: Text("Password updated")),
                 );
               } catch (e) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text("Error: $e")),
-                );
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(SnackBar(content: Text("Error: $e")));
               }
             },
             child: const Text("Update"),
-          )
+          ),
         ],
       ),
     );
@@ -471,9 +510,11 @@ class _SettingsBodyState extends State<_SettingsBody> {
                 value: _darkMode,
                 onChanged: (v) {
                   setState(() => setState(() => _darkMode = v));
-                  Provider.of<ThemeController>(context, listen: false)
-                  .setDarkMode(v);
-                }
+                  Provider.of<ThemeController>(
+                    context,
+                    listen: false,
+                  ).setDarkMode(v);
+                },
               ),
             ],
           ),
@@ -502,7 +543,6 @@ class _SettingsBodyState extends State<_SettingsBody> {
       ),
     );
   }
-
 }
 
 class _SettingsSectionTitle extends StatelessWidget {
@@ -515,9 +555,9 @@ class _SettingsSectionTitle extends StatelessWidget {
     return Text(
       title,
       style: Theme.of(context).textTheme.titleLarge?.copyWith(
-  fontSize: 18, // Overriding only the size if needed
-  fontWeight: FontWeight.w700,
-),
+        fontSize: 18, // Overriding only the size if needed
+        fontWeight: FontWeight.w700,
+      ),
     );
   }
 }

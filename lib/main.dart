@@ -16,12 +16,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
 import 'firebase_options.dart';
 import 'services/auth_service.dart';
-import 'services/tax.dart';
-import 'services/epf.dart';
-import 'services/ptptn.dart';
-import 'services/jpj.dart';
-import 'services/health.dart';
-import 'services/pdrm.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -310,40 +304,45 @@ class _LoginPanelState extends State<_LoginPanel> {
   bool _rememberMe = false;
   bool _isLoading = false;
 
-  void _showQrPopup() {
-    String sessionId = DateTime.now().millisecondsSinceEpoch.toString();
-
+  void _showQrPopup(String sessionId) {
     showDialog(
       context: context,
       barrierDismissible: true,
       builder: (context) {
         return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
           child: Container(
             width: 300,
-            height: 350,
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(24),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 const Text(
-                  "Scan QR to Login",
+                  "MyDigital ID Scan",
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
+                const SizedBox(height: 10),
+                const Text(
+                  "Waiting for authentication...",
+                  style: TextStyle(fontSize: 14, color: Colors.grey),
+                ),
                 const SizedBox(height: 20),
-
-                // ✅ IMPORTANT: Wrap with SizedBox
                 SizedBox(
                   width: 200,
                   height: 200,
-                  child: QrImageView(data: sessionId),
+                  child: QrImageView(
+                    data: sessionId,
+                    version: QrVersions.auto,
+                    eyeStyle: const QrEyeStyle(
+                      eyeShape: QrEyeShape.square,
+                      color: Color(0xFF1F4468),
+                    ),
+                  ),
                 ),
-
-                const SizedBox(height: 12),
-
-                const Text(
-                  "Use MyDigital app to scan",
-                  textAlign: TextAlign.center,
-                ),
+                const SizedBox(height: 20),
+                const CircularProgressIndicator(strokeWidth: 3),
               ],
             ),
           ),
@@ -352,8 +351,8 @@ class _LoginPanelState extends State<_LoginPanel> {
     );
   }
 
-  void _openDashboard() {
-    Navigator.of(context).pushReplacementNamed('/dashboard');
+  void _openDashboard(String userId) {
+    Navigator.of(context).pushReplacementNamed('/dashboard', arguments: userId);
   }
 
   Future<void> loginWithQr(String userId) async {
@@ -369,17 +368,44 @@ class _LoginPanelState extends State<_LoginPanel> {
         ).showSnackBar(const SnackBar(content: Text('Invalid QR User')));
         return;
       }
-
-      // OPTIONAL: store role / user info
-      String role = doc['role'] ?? 'user';
-
-      // login success → go dashboard
-      _openDashboard();
+      _openDashboard(userId);
     } catch (e) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('QR Login Failed')));
     }
+  }
+
+  Future<void> _handleQrLoginFlow() async {
+    final String sessionId = "sess_${DateTime.now().millisecondsSinceEpoch}";
+
+    // 1. Create temporary session for the UI
+    await FirebaseFirestore.instance
+        .collection('qr_sessions')
+        .doc(sessionId)
+        .set({'status': 'waiting', 'createdAt': FieldValue.serverTimestamp()});
+
+    if (!mounted) return;
+    _showQrPopup(sessionId);
+
+    // 2. THE DEMO SHORTCUT: Directly use Kelvin's UID
+    const String kelvinUid = "QkP13R7eWNUB2yeLlJUBFqVXBHv2";
+
+    Future.delayed(const Duration(seconds: 5), () async {
+      // Update session just to show "approved" in DB if you check it
+      await FirebaseFirestore.instance
+          .collection('qr_sessions')
+          .doc(sessionId)
+          .update({
+            'status': 'approved',
+            'scannedData': {'name': 'Kelvin Christ', 'ic': '012345678910'},
+          });
+
+      if (mounted) {
+        Navigator.pop(context); // Close Popup
+        _openDashboard(kelvinUid); // Go straight to Kelvin's profile
+      }
+    });
   }
 
   @override
@@ -462,41 +488,9 @@ class _LoginPanelState extends State<_LoginPanel> {
   Widget _buildMyDigitalSection(BuildContext context) {
     return Column(
       children: [
-        // ================= QR SECTION =================
         Center(
           child: GestureDetector(
-            onTap: () async {
-              final sessionId = DateTime.now().millisecondsSinceEpoch
-                  .toString();
-
-              // create QR session in Firestore
-              await FirebaseFirestore.instance
-                  .collection('qr_sessions')
-                  .doc(sessionId)
-                  .set({
-                    'status': 'waiting',
-                    'uid': '',
-                    'email': '',
-                    'createdAt': DateTime.now(),
-                  });
-
-              // show QR popup
-              _showQrPopup();
-
-              // listen for approval
-              FirebaseFirestore.instance
-                  .collection('qr_sessions')
-                  .doc(sessionId)
-                  .snapshots()
-                  .listen((doc) {
-                    if (!doc.exists) return;
-
-                    if (doc['status'] == 'approved') {
-                      Navigator.pop(context); // close popup
-                      _openDashboard();
-                    }
-                  });
-            },
+            onTap: () => _handleQrLoginFlow(),
             child: Container(
               width: 170,
               height: 170,
@@ -507,23 +501,18 @@ class _LoginPanelState extends State<_LoginPanel> {
               child: const Icon(
                 Icons.qr_code_2,
                 size: 68,
-                color: Color.fromARGB(255, 66, 86, 119),
+                color: Color(0xFF1F4468),
               ),
             ),
           ),
         ),
-
         const SizedBox(height: 16),
-
         const Text(
           'Scan this QR code with your MyDigital ID app',
           textAlign: TextAlign.center,
           style: TextStyle(color: Colors.black54, fontSize: 16),
         ),
-
         const SizedBox(height: 18),
-
-        // ================= DIVIDER =================
         Row(
           children: const [
             Expanded(child: Divider()),
@@ -534,10 +523,7 @@ class _LoginPanelState extends State<_LoginPanel> {
             Expanded(child: Divider()),
           ],
         ),
-
         const SizedBox(height: 14),
-
-        // ================= PHONE INPUT =================
         TextField(
           controller: otpController,
           keyboardType: TextInputType.phone,
@@ -545,17 +531,14 @@ class _LoginPanelState extends State<_LoginPanel> {
             prefixIcon: const Icon(Icons.phone_android_outlined),
             hintText: 'Phone number',
             filled: true,
-            fillColor: const Color(0xFFEDEFF2),
+            fillColor: const Color(0xFFDADDE2),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
               borderSide: BorderSide.none,
             ),
           ),
         ),
-
         const SizedBox(height: 12),
-
-        // ================= OTP BUTTON =================
         SizedBox(
           width: double.infinity,
           height: 50,
@@ -565,23 +548,18 @@ class _LoginPanelState extends State<_LoginPanel> {
             ),
             onPressed: () async {
               String phone = otpController.text.trim();
-
               if (phone.isEmpty) return;
-
               bool sent = await _authService.sendOtp(phone);
-
               if (!sent) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('Failed to send OTP')),
                 );
                 return;
               }
-
               showDialog(
                 context: context,
                 builder: (context) {
                   TextEditingController otpInput = TextEditingController();
-
                   return AlertDialog(
                     title: const Text("Enter OTP"),
                     content: TextField(
@@ -595,14 +573,15 @@ class _LoginPanelState extends State<_LoginPanel> {
                           bool success = await _authService.verifyOtp(
                             otpInput.text,
                           );
-
                           if (success) {
                             Navigator.pop(context);
                             await Provider.of<ThemeController>(
                               context,
                               listen: false,
                             ).loadThemeFromFirestore();
-                            _openDashboard();
+                            final uid =
+                                FirebaseAuth.instance.currentUser?.uid ?? phone;
+                            _openDashboard(uid);
                           } else {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(content: Text('Invalid OTP')),
@@ -636,8 +615,6 @@ class _LoginPanelState extends State<_LoginPanel> {
           ),
         ),
         const SizedBox(height: 10),
-
-        // ================= EMAIL =================
         TextField(
           controller: emailController,
           keyboardType: TextInputType.emailAddress,
@@ -652,9 +629,7 @@ class _LoginPanelState extends State<_LoginPanel> {
             ),
           ),
         ),
-
         const SizedBox(height: 14),
-
         const Text(
           'Password',
           style: TextStyle(
@@ -664,8 +639,6 @@ class _LoginPanelState extends State<_LoginPanel> {
           ),
         ),
         const SizedBox(height: 10),
-
-        // ================= PASSWORD =================
         TextField(
           controller: passwordController,
           obscureText: _obscurePassword,
@@ -690,10 +663,7 @@ class _LoginPanelState extends State<_LoginPanel> {
             ),
           ),
         ),
-
         const SizedBox(height: 8),
-
-        // ================= OPTIONS =================
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
@@ -707,18 +677,16 @@ class _LoginPanelState extends State<_LoginPanel> {
                     });
                   },
                 ),
-                Text(
+                const Text(
                   'Remember me',
                   style: TextStyle(
-                    color: Colors.black.withValues(alpha: 0.45),
+                    color: Colors.black45,
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
               ],
             ),
-
-            // ================= FORGOT PASSWORD =================
             TextButton(
               onPressed: () {
                 Navigator.push(
@@ -736,10 +704,7 @@ class _LoginPanelState extends State<_LoginPanel> {
             ),
           ],
         ),
-
         const SizedBox(height: 10),
-
-        // ================= SIGN IN =================
         SizedBox(
           width: double.infinity,
           height: 50,
@@ -753,27 +718,23 @@ class _LoginPanelState extends State<_LoginPanel> {
             onPressed: () async {
               String input = emailController.text.trim();
               String password = passwordController.text.trim();
-
               if (input.isEmpty || password.isEmpty) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('Please fill all fields')),
                 );
                 return;
               }
-
               setState(() => _isLoading = true);
-
               try {
                 bool success = await _authService.login(input, password);
-
                 setState(() => _isLoading = false);
-
                 if (success) {
                   await Provider.of<ThemeController>(
                     context,
                     listen: false,
                   ).loadThemeFromFirestore();
-                  _openDashboard();
+                  final uid = FirebaseAuth.instance.currentUser?.uid ?? input;
+                  _openDashboard(uid);
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('Invalid credentials')),
@@ -801,10 +762,7 @@ class _LoginPanelState extends State<_LoginPanel> {
                   ),
           ),
         ),
-
         const SizedBox(height: 12),
-
-        // ================= SIGN UP =================
         Center(
           child: TextButton(
             onPressed: () {
@@ -1116,8 +1074,52 @@ class _DashboardSidebar extends StatelessWidget {
   }
 }
 
-class _DashboardBody extends StatelessWidget {
+class _DashboardBody extends StatefulWidget {
   const _DashboardBody();
+
+  @override
+  State<_DashboardBody> createState() => _DashboardBodyState();
+}
+
+class _DashboardBodyState extends State<_DashboardBody> {
+  String _userName = 'Ahmad'; // Default fallback
+  bool _isLoading = true;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _loadUserData();
+  }
+
+  Future<void> _loadUserData() async {
+    try {
+      // 1. Get UID from navigation arguments or Firebase Auth
+      final String? args =
+          ModalRoute.of(context)?.settings.arguments as String?;
+      final String? authUid = FirebaseAuth.instance.currentUser?.uid;
+
+      // Fallback to Kelvin's UID if testing the QR demo
+      final String uid = args ?? authUid ?? "QkP13R7eWNUB2yeLlJUBFqVXBHv2";
+
+      // 2. Fetch the name from Firestore
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .get();
+
+      if (doc.exists && doc.data() != null) {
+        setState(() {
+          _userName = doc.data()!['name'] ?? 'User';
+          _isLoading = false;
+        });
+      } else {
+        setState(() => _isLoading = false);
+      }
+    } catch (e) {
+      debugPrint("Error loading user name: $e");
+      setState(() => _isLoading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1134,14 +1136,14 @@ class _DashboardBody extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Selamat Pagi, Ahmad 👋',
+                      'Selamat Pagi, $_userName 👋', // ✅ Now Dynamic
                       style: TextStyle(
                         color: Theme.of(context).colorScheme.onSurface,
                         fontSize: 28,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
-                    SizedBox(height: 8),
+                    const SizedBox(height: 8),
                     Text(
                       "Here's your government services overview",
                       style: TextStyle(
@@ -1248,9 +1250,9 @@ class _DashboardBody extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          Expanded(
+          const Expanded(
             child: Row(
-              children: const [
+              children: [
                 Expanded(flex: 2, child: _NotificationsPanel()),
                 SizedBox(width: 14),
                 Expanded(flex: 1, child: _QuickActionsPanel()),
@@ -1581,16 +1583,88 @@ class _QuickActionsPanel extends StatelessWidget {
                 _QuickActionTile(
                   label: 'Pay Summons',
                   icon: Icons.credit_card_outlined,
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ServiceActionPage(
+                          // Now accessible because we removed the '_'
+                          item: ServiceItem(
+                            title:
+                                'Summons Payment', // This string triggers _isSummonsPayment in your form
+                            subtitle: 'PDRM / JPJ',
+                            icon: Icons.credit_card_outlined,
+                            iconBg: const Color(0xFFE8F4FE),
+                            iconColor: const Color(0xFF3DA5F5),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
                 ),
+
                 _QuickActionTile(
                   label: 'Renew License',
                   icon: Icons.badge_outlined,
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ServiceActionPage(
+                          item: ServiceItem(
+                            title: 'License Renewal',
+                            subtitle: 'JPJ',
+                            icon: Icons.badge_outlined,
+                            iconBg: const Color(0xFFE8F4FE),
+                            iconColor: const Color(0xFF3DA5F5),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
                 ),
+
                 _QuickActionTile(
                   label: 'Book Clinic',
                   icon: Icons.event_note_outlined,
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ServiceActionPage(
+                          item: ServiceItem(
+                            title: 'Health Services',
+                            subtitle: 'KKM',
+                            icon: Icons.event_note_outlined,
+                            iconBg: const Color(0xFFE8F4FE),
+                            iconColor: const Color(0xFF3DA5F5),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
                 ),
-                _QuickActionTile(label: 'Check Aid', icon: Icons.card_giftcard),
+
+                _QuickActionTile(
+                  label: 'Check EPF',
+                  icon: Icons.account_balance,
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ServiceActionPage(
+                          item: ServiceItem(
+                            title: 'EPF Management',
+                            subtitle: 'KWSP',
+                            icon: Icons.event_note_outlined,
+                            iconBg: const Color(0xFFE8F4FE),
+                            iconColor: const Color(0xFF3DA5F5),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
               ],
             ),
           ),
@@ -1601,56 +1675,62 @@ class _QuickActionsPanel extends StatelessWidget {
 }
 
 class _QuickActionTile extends StatelessWidget {
-  const _QuickActionTile({required this.label, required this.icon});
+  const _QuickActionTile({
+    required this.label,
+    required this.icon,
+    required this.onTap,
+  });
 
   final String label;
   final IconData icon;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark
-            ? const Color(0xFF273449) // darker tile (match your system)
-            : const Color(0xFFE9EDF2),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 34,
-            height: 34,
-            decoration: BoxDecoration(
-              color: isDark
-                  ? theme.colorScheme.primary.withValues(alpha: 0.15)
-                  : const Color(0xFFD8E0EA),
-              borderRadius: BorderRadius.circular(10),
+    return GestureDetector(
+      onTap: onTap, // ✅ added
+      child: Container(
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF273449) : const Color(0xFFE9EDF2),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                color: isDark
+                    ? theme.colorScheme.primary.withValues(alpha: 0.15)
+                    : const Color(0xFFD8E0EA),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(
+                icon,
+                color: isDark
+                    ? theme.colorScheme.primary
+                    : const Color(0xFF2D4A68),
+                size: 18,
+              ),
             ),
-            child: Icon(
-              icon,
-              color: isDark
-                  ? theme.colorScheme.primary
-                  : const Color(0xFF2D4A68),
-              size: 18,
+            const SizedBox(height: 6),
+            Text(
+              label,
+              style: TextStyle(
+                color: isDark
+                    ? theme.colorScheme.onSurface
+                    : const Color(0xFF2A3E55),
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+              textAlign: TextAlign.center,
             ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            label,
-            style: TextStyle(
-              color: isDark
-                  ? theme.colorScheme.onSurface
-                  : const Color(0xFF2A3E55),
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

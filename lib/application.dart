@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'chat_assistant_fab.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class ApplicationPage extends StatelessWidget {
   const ApplicationPage({super.key});
@@ -8,7 +9,7 @@ class ApplicationPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor, 
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(6),
@@ -16,10 +17,7 @@ class ApplicationPage extends StatelessWidget {
             borderRadius: BorderRadius.circular(12),
             child: Row(
               children: [
-                SizedBox(
-                  width: 220,
-                  child: _ApplicationSidebar(),
-                ),
+                SizedBox(width: 220, child: _ApplicationSidebar()),
                 Expanded(
                   child: ColoredBox(
                     color: theme.scaffoldBackgroundColor,
@@ -43,8 +41,16 @@ class _ApplicationSidebar extends StatelessWidget {
     _ApplicationNavItem('Dashboard', Icons.dashboard_outlined, false),
     _ApplicationNavItem('Services', Icons.grid_view_outlined, false),
     _ApplicationNavItem('My Applications', Icons.description_outlined, true),
-    _ApplicationNavItem('Payments', Icons.account_balance_wallet_outlined, false),
-    _ApplicationNavItem('Notifications', Icons.notifications_none_outlined, false),
+    _ApplicationNavItem(
+      'Payments',
+      Icons.account_balance_wallet_outlined,
+      false,
+    ),
+    _ApplicationNavItem(
+      'Notifications',
+      Icons.notifications_none_outlined,
+      false,
+    ),
     _ApplicationNavItem('Profile', Icons.person_outline, false),
     _ApplicationNavItem('Settings', Icons.settings_outlined, false),
   ];
@@ -130,22 +136,34 @@ class _ApplicationSidebar extends StatelessWidget {
                       ),
                       onTap: () {
                         if (item.title == 'Dashboard') {
-                          Navigator.of(context).pushReplacementNamed('/dashboard');
+                          Navigator.of(
+                            context,
+                          ).pushReplacementNamed('/dashboard');
                         }
                         if (item.title == 'Services') {
-                          Navigator.of(context).pushReplacementNamed('/services');
+                          Navigator.of(
+                            context,
+                          ).pushReplacementNamed('/services');
                         }
                         if (item.title == 'Payments') {
-                          Navigator.of(context).pushReplacementNamed('/payments');
+                          Navigator.of(
+                            context,
+                          ).pushReplacementNamed('/payments');
                         }
                         if (item.title == 'Notifications') {
-                          Navigator.of(context).pushReplacementNamed('/notifications');
+                          Navigator.of(
+                            context,
+                          ).pushReplacementNamed('/notifications');
                         }
                         if (item.title == 'Profile') {
-                          Navigator.of(context).pushReplacementNamed('/profile');
+                          Navigator.of(
+                            context,
+                          ).pushReplacementNamed('/profile');
                         }
                         if (item.title == 'Settings') {
-                          Navigator.of(context).pushReplacementNamed('/settings');
+                          Navigator.of(
+                            context,
+                          ).pushReplacementNamed('/settings');
                         }
                       },
                     ),
@@ -154,21 +172,31 @@ class _ApplicationSidebar extends StatelessWidget {
               },
             ),
           ),
-          const Padding(
-            padding: EdgeInsets.fromLTRB(18, 4, 18, 16),
-            child: Row(
-              children: [
-                Icon(Icons.logout, color: Color(0xFFC2D1DF)),
-                SizedBox(width: 10),
-                Text(
-                  'Logout',
-                  style: TextStyle(
-                    color: Color(0xFFC2D1DF),
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 4, 18, 16),
+            child: InkWell(
+              onTap: () async {
+                await FirebaseAuth.instance.signOut();
+
+                // IMPORTANT: clear navigation stack
+                Navigator.of(
+                  context,
+                ).pushNamedAndRemoveUntil('/login', (route) => false);
+              },
+              child: const Row(
+                children: [
+                  Icon(Icons.logout, color: Color(0xFFC2D1DF)),
+                  SizedBox(width: 10),
+                  Text(
+                    'Logout',
+                    style: TextStyle(
+                      color: Color(0xFFC2D1DF),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ],
@@ -182,172 +210,172 @@ class _ApplicationBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-  final theme = Theme.of(context);
+    final theme = Theme.of(context);
 
-  return SingleChildScrollView(
-    padding: const EdgeInsets.fromLTRB(20, 14, 18, 14),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'My Applications',
-          style: TextStyle(
-            color: theme.colorScheme.onSurface,
-            fontSize: 30,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-
-        const SizedBox(height: 6),
-
-        Text(
-          'Track all your government applications in one place',
-          style: TextStyle(
-            color: theme.colorScheme.onSurfaceVariant,
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-
-        const SizedBox(height: 16),
-
-        _ApplicationTrackerCard(),
-
-        const SizedBox(height: 18),
-
-        Row(
-          children: [
-            Icon(
-              Icons.auto_awesome,
-              color: theme.colorScheme.secondary, // ✅ FIXED
-              size: 18,
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(20, 14, 18, 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'My Applications',
+            style: TextStyle(
+              color: theme.colorScheme.onSurface,
+              fontSize: 30,
+              fontWeight: FontWeight.w700,
             ),
-            const SizedBox(width: 8),
-            Text(
-              'Suggested for You',
-              style: TextStyle(
-                color: theme.colorScheme.onSurface,
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
+          ),
+
+          const SizedBox(height: 6),
+
+          Text(
+            'Track all your government applications in one place',
+            style: TextStyle(
+              color: theme.colorScheme.onSurfaceVariant,
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          _ApplicationTrackerCard(),
+
+          const SizedBox(height: 18),
+
+          Row(
+            children: [
+              Icon(
+                Icons.auto_awesome,
+                color: theme.colorScheme.secondary, // ✅ FIXED
+                size: 18,
               ),
-            ),
-          ],
-        ),
+              const SizedBox(width: 8),
+              Text(
+                'Suggested for You',
+                style: TextStyle(
+                  color: theme.colorScheme.onSurface,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
 
-        const SizedBox(height: 10),
+          const SizedBox(height: 10),
 
-        _SuggestionGrid(),
-      ],
-    ),
-  );
-}
+          _SuggestionGrid(),
+        ],
+      ),
+    );
+  }
 }
 
 class _ApplicationTrackerCard extends StatelessWidget {
   const _ApplicationTrackerCard();
 
   @override
-Widget build(BuildContext context) {
-  final isDark = Theme.of(context).brightness == Brightness.dark;
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-  return Container(
-    decoration: BoxDecoration(
-      color: Theme.of(context).colorScheme.surface,
-      borderRadius: BorderRadius.circular(12),
-      border: Border.all(color: const Color(0xFFD9DEE5)), // kept as-is
-    ),
-    child: Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          child: Row(
-            children: [
-              Text(
-                'Application Tracker',
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurface,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFD9DEE5)), // kept as-is
+      ),
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: Row(
+              children: [
+                Text(
+                  'Application Tracker',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-        Divider(height: 1, color: Theme.of(context).dividerColor),
+          Divider(height: 1, color: Theme.of(context).dividerColor),
 
-        // ================= PENDING =================
-        _ApplicationRow(
-          title: 'STR Aid Application',
-          subtitle: 'PADU • 28 Mar 2026',
-          status: 'Pending',
-          statusTextColor: Colors.orange,
-          statusBgColor: isDark
-              ? Colors.orange.withValues(alpha: 0.15)
-              : const Color(0xFFFFF1D6),
-          icon: Icons.schedule,
-          iconColor: Colors.orange,
-          iconBgColor: isDark
-              ? Colors.orange.withValues(alpha: 0.15)
-              : const Color(0xFFFFF1D6),
-        ),
+          // ================= PENDING =================
+          _ApplicationRow(
+            title: 'STR Aid Application',
+            subtitle: 'PADU • 28 Mar 2026',
+            status: 'Pending',
+            statusTextColor: Colors.orange,
+            statusBgColor: isDark
+                ? Colors.orange.withValues(alpha: 0.15)
+                : const Color(0xFFFFF1D6),
+            icon: Icons.schedule,
+            iconColor: Colors.orange,
+            iconBgColor: isDark
+                ? Colors.orange.withValues(alpha: 0.15)
+                : const Color(0xFFFFF1D6),
+          ),
 
-        Divider(height: 1, color: Theme.of(context).dividerColor),
+          Divider(height: 1, color: Theme.of(context).dividerColor),
 
-        // ================= APPROVED =================
-        _ApplicationRow(
-          title: 'eKasih Registration',
-          subtitle: 'ICU JPM • 15 Mar 2026',
-          status: 'Approved',
-          statusTextColor: Colors.green,
-          statusBgColor: isDark
-              ? Colors.green.withValues(alpha: 0.15)
-              : const Color(0xFFE4F6EC),
-          icon: Icons.check_circle_outline,
-          iconColor: Colors.green,
-          iconBgColor: isDark
-              ? Colors.green.withValues(alpha: 0.15)
-              : const Color(0xFFE4F6EC),
-        ),
+          // ================= APPROVED =================
+          _ApplicationRow(
+            title: 'eKasih Registration',
+            subtitle: 'ICU JPM • 15 Mar 2026',
+            status: 'Approved',
+            statusTextColor: Colors.green,
+            statusBgColor: isDark
+                ? Colors.green.withValues(alpha: 0.15)
+                : const Color(0xFFE4F6EC),
+            icon: Icons.check_circle_outline,
+            iconColor: Colors.green,
+            iconBgColor: isDark
+                ? Colors.green.withValues(alpha: 0.15)
+                : const Color(0xFFE4F6EC),
+          ),
 
-        Divider(height: 1, color: Theme.of(context).dividerColor),
+          Divider(height: 1, color: Theme.of(context).dividerColor),
 
-        // ================= PROCESSING =================
-        _ApplicationRow(
-          title: 'License Renewal',
-          subtitle: 'JPJ • 1 Apr 2026',
-          status: 'Processing',
-          statusTextColor: Colors.blue,
-          statusBgColor: isDark
-              ? Colors.blue.withValues(alpha: 0.15)
-              : const Color(0xFFE5F4FD),
-          icon: Icons.timelapse,
-          iconColor: Colors.blue,
-          iconBgColor: isDark
-              ? Colors.blue.withValues(alpha: 0.15)
-              : const Color(0xFFE5F4FD),
-        ),
+          // ================= PROCESSING =================
+          _ApplicationRow(
+            title: 'License Renewal',
+            subtitle: 'JPJ • 1 Apr 2026',
+            status: 'Processing',
+            statusTextColor: Colors.blue,
+            statusBgColor: isDark
+                ? Colors.blue.withValues(alpha: 0.15)
+                : const Color(0xFFE5F4FD),
+            icon: Icons.timelapse,
+            iconColor: Colors.blue,
+            iconBgColor: isDark
+                ? Colors.blue.withValues(alpha: 0.15)
+                : const Color(0xFFE5F4FD),
+          ),
 
-        Divider(height: 1, color: Theme.of(context).dividerColor),
+          Divider(height: 1, color: Theme.of(context).dividerColor),
 
-        // ================= REJECTED =================
-        _ApplicationRow(
-          title: 'PTPTN Repayment Plan',
-          subtitle: 'PTPTN • 10 Mar 2026',
-          status: 'Rejected',
-          statusTextColor: Colors.red,
-          statusBgColor: isDark
-              ? Colors.red.withValues(alpha: 0.15)
-              : const Color(0xFFFBE9EA),
-          icon: Icons.cancel_outlined,
-          iconColor: Colors.red,
-          iconBgColor: isDark
-              ? Colors.red.withValues(alpha: 0.15)
-              : const Color(0xFFFBE9EA),
-        ),
-      ],
-    ),
-  );
-}
+          // ================= REJECTED =================
+          _ApplicationRow(
+            title: 'PTPTN Repayment Plan',
+            subtitle: 'PTPTN • 10 Mar 2026',
+            status: 'Rejected',
+            statusTextColor: Colors.red,
+            statusBgColor: isDark
+                ? Colors.red.withValues(alpha: 0.15)
+                : const Color(0xFFFBE9EA),
+            icon: Icons.cancel_outlined,
+            iconColor: Colors.red,
+            iconBgColor: isDark
+                ? Colors.red.withValues(alpha: 0.15)
+                : const Color(0xFFFBE9EA),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _ApplicationRow extends StatelessWidget {
@@ -452,7 +480,8 @@ class _SuggestionGrid extends StatelessWidget {
         ),
         _SuggestionTile(
           title: 'Apply for MyKasih',
-          subtitle: 'Your household profile matches the MyKasih food aid criteria.',
+          subtitle:
+              'Your household profile matches the MyKasih food aid criteria.',
         ),
       ],
     );

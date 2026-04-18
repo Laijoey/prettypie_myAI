@@ -14,7 +14,7 @@ const admin = require("firebase-admin");
 
 admin.initializeApp({
   credential: admin.credential.applicationDefault(),
-  storageBucket: "prettypie.appspot.com" // ✅ ADD THIS
+  storageBucket: "prettypie.firebasestorage.app" // ✅ ADD THIS
 });
 
 const { genkit } = require("genkit");
@@ -102,10 +102,8 @@ app.post("/upload-doc", verifyUser, upload.single("file"), async (req, res) => {
 
     const file = req.file;
 
-    // ✅ document type from frontend (epf, health, loan, lesen, summons, etc.)
     const type = req.body.type || "general";
 
-    // optional: restrict allowed types (recommended)
     const allowedTypes = ["lhdn", "kwsp", "kkm", "ptptn", "jpj", "pdrm", "general"];
 
     if (!allowedTypes.includes(type)) {
@@ -115,9 +113,7 @@ app.post("/upload-doc", verifyUser, upload.single("file"), async (req, res) => {
       });
     }
 
-    // ✅ clean file path in Firebase Storage
     const fileName = `${type}/${uid}/${Date.now()}_${file.originalname}`;
-
     const blob = bucket.file(fileName);
 
     const blobStream = blob.createWriteStream({
@@ -128,7 +124,6 @@ app.post("/upload-doc", verifyUser, upload.single("file"), async (req, res) => {
 
     blobStream.on("error", (err) => {
       console.error("Upload error:", err);
-
       return res.status(500).json({
         success: false,
         error: err.message,
@@ -136,23 +131,34 @@ app.post("/upload-doc", verifyUser, upload.single("file"), async (req, res) => {
     });
 
     blobStream.on("finish", async () => {
-      const publicUrl = `https://storage.googleapis.com/${bucket.name}/${blob.name}`;
+      try {
+        // ✅ MAKE FILE PUBLIC
+        await blob.makePublic();
 
-      return res.json({
-        success: true,
-        message: "File uploaded successfully",
-        data: {
-          fileName: file.originalname,
-          type: type,
-          url: publicUrl,
-        },
-      });
+        const publicUrl = `https://storage.googleapis.com/${bucket.name}/${blob.name}`;
+
+        return res.json({
+          success: true,
+          message: "File uploaded successfully",
+          data: {
+            fileName: file.originalname,
+            type: type,
+            url: publicUrl,
+          },
+        });
+      } catch (err) {
+        console.error("Public URL error:", err);
+        return res.status(500).json({
+          success: false,
+          error: err.message,
+        });
+      }
     });
 
     blobStream.end(file.buffer);
+
   } catch (err) {
     console.error("Server error:", err);
-
     return res.status(500).json({
       success: false,
       error: err.message,

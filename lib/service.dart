@@ -88,7 +88,7 @@ class _ServicesSidebar extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 10),
-                const Column(
+                Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
@@ -176,21 +176,31 @@ class _ServicesSidebar extends StatelessWidget {
               },
             ),
           ),
-          const Padding(
-            padding: EdgeInsets.fromLTRB(18, 4, 18, 16),
-            child: Row(
-              children: [
-                Icon(Icons.logout, color: Color(0xFFC2D1DF)),
-                SizedBox(width: 10),
-                Text(
-                  'Logout',
-                  style: TextStyle(
-                    color: Color(0xFFC2D1DF),
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 4, 18, 16),
+            child: InkWell(
+              onTap: () async {
+                await FirebaseAuth.instance.signOut();
+
+                // IMPORTANT: clear navigation stack
+                Navigator.of(
+                  context,
+                ).pushNamedAndRemoveUntil('/login', (route) => false);
+              },
+              child: const Row(
+                children: [
+                  Icon(Icons.logout, color: Color(0xFFC2D1DF)),
+                  SizedBox(width: 10),
+                  Text(
+                    'Logout',
+                    style: TextStyle(
+                      color: Color(0xFFC2D1DF),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ],
@@ -213,7 +223,7 @@ class _ServicesBodyState extends State<_ServicesBody> {
   Widget build(BuildContext context) {
     final lowerQuery = query.toLowerCase();
 
-    List<_ServiceItem> filter(List<_ServiceItem> items) {
+    List<ServiceItem> filter(List<ServiceItem> items) {
       return items.where((item) {
         final titleMatch = item.title.toLowerCase().contains(lowerQuery);
 
@@ -407,7 +417,7 @@ class _ServiceSectionTitle extends StatelessWidget {
 class _ServiceGrid extends StatelessWidget {
   const _ServiceGrid({required this.items, required this.showArrow});
 
-  final List<_ServiceItem> items;
+  final List<ServiceItem> items;
   final bool showArrow;
 
   @override
@@ -429,7 +439,7 @@ class _ServiceGrid extends StatelessWidget {
           showArrow: showArrow,
           onTap: () {
             Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => _ServiceActionPage(item: item)),
+              MaterialPageRoute(builder: (_) => ServiceActionPage(item: item)),
             );
           },
         );
@@ -446,7 +456,7 @@ class _ServiceTile extends StatelessWidget {
     super.key,
   });
 
-  final _ServiceItem item;
+  final ServiceItem item;
   final bool showArrow;
   final VoidCallback onTap;
 
@@ -470,7 +480,7 @@ class _ServiceTile extends StatelessWidget {
           decoration: BoxDecoration(
             color: Theme.of(context).colorScheme.surface,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFD9DEE5)),
+            border: Border.all(color: Theme.of(context).dividerColor),
           ),
           child: Row(
             children: [
@@ -523,16 +533,16 @@ class _ServiceTile extends StatelessWidget {
   }
 }
 
-class _ServiceActionPage extends StatefulWidget {
-  const _ServiceActionPage({required this.item});
+class ServiceActionPage extends StatefulWidget {
+  const ServiceActionPage({required this.item});
 
-  final _ServiceItem item;
+  final ServiceItem item;
 
   @override
-  State<_ServiceActionPage> createState() => _ServiceActionPageState();
+  State<ServiceActionPage> createState() => _ServiceActionPageState();
 }
 
-class _ServiceActionPageState extends State<_ServiceActionPage> {
+class _ServiceActionPageState extends State<ServiceActionPage> {
   final _formKey = GlobalKey<FormState>();
   final _tinController = TextEditingController();
   final _idController = TextEditingController();
@@ -610,63 +620,59 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
   }
 
   Future<void> uploadDocument(String type) async {
-  try {
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['pdf', 'jpg', 'png'],
-      withData: true,
-    );
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf', 'jpg', 'png'],
+        withData: true,
+      );
 
-    if (result == null || result.files.first.bytes == null) return;
+      if (result == null || result.files.first.bytes == null) return;
 
-    final file = result.files.first;
+      final file = result.files.first;
 
-    setState(() => isLoading = true);
+      setState(() => isLoading = true);
 
-    final user = FirebaseAuth.instance.currentUser;
-    final token = await user!.getIdToken();
+      final user = FirebaseAuth.instance.currentUser;
+      final token = await user!.getIdToken();
 
-    final request = http.MultipartRequest(
-      "POST",
-      Uri.parse("$baseUrl/upload-doc"), // ✅ updated endpoint
-    );
+      final request = http.MultipartRequest(
+        "POST",
+        Uri.parse("$baseUrl/upload-doc"), // ✅ updated endpoint
+      );
 
-    request.headers["Authorization"] = "Bearer $token";
+      request.headers["Authorization"] = "Bearer $token";
 
-    // ✅ ADD TYPE (epf, health, loan, lesen, summons)
-    request.fields["type"] = type;
+      // ✅ ADD TYPE (epf, health, loan, lesen, summons)
+      request.fields["type"] = type;
 
-    request.files.add(
-      http.MultipartFile.fromBytes(
-        "file",
-        file.bytes!,
-        filename: file.name,
-      ),
-    );
+      request.files.add(
+        http.MultipartFile.fromBytes("file", file.bytes!, filename: file.name),
+      );
 
-    final response = await request.send();
-    final responseBody = await response.stream.bytesToString();
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
 
-    print("UPLOAD STATUS: ${response.statusCode}");
-    print("UPLOAD RESPONSE: $responseBody");
+      print("UPLOAD STATUS: ${response.statusCode}");
+      print("UPLOAD RESPONSE: $responseBody");
 
-    final data = jsonDecode(responseBody);
+      final data = jsonDecode(responseBody);
 
-    if (response.statusCode != 200 || data["success"] != true) {
-      throw Exception(data["error"] ?? "Upload failed");
+      if (response.statusCode != 200 || data["success"] != true) {
+        throw Exception(data["error"] ?? "Upload failed");
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Document uploaded successfully ✅")),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Upload failed: $e")));
+    } finally {
+      setState(() => isLoading = false);
     }
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Document uploaded successfully ✅")),
-    );
-  } catch (e) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("Upload failed: $e")),
-    );
-  } finally {
-    setState(() => isLoading = false);
   }
-}
 
   void _submitTaxPayment() {
     if (!(_formKey.currentState?.validate() ?? false)) {
@@ -681,12 +687,13 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F7),
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text(widget.item.title),
         backgroundColor: Colors.transparent,
-        foregroundColor: const Color(0xFF1E2D3F),
+        foregroundColor: Theme.of(context).colorScheme.onSurfaceVariant,
         elevation: 0,
         scrolledUnderElevation: 0,
       ),
@@ -699,9 +706,9 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
               width: double.infinity,
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: Theme.of(context).colorScheme.surface,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFD9DEE5)),
+                border: Border.all(color: Theme.of(context).dividerColor),
               ),
               child: Row(
                 children: [
@@ -721,8 +728,10 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
                       children: [
                         Text(
                           widget.item.title,
-                          style: const TextStyle(
-                            color: Color(0xFF1E2D3F),
+                          style: TextStyle(
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
                             fontSize: 18,
                             fontWeight: FontWeight.w700,
                           ),
@@ -730,8 +739,10 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
                         const SizedBox(height: 3),
                         Text(
                           'Agency: ${widget.item.subtitle}',
-                          style: const TextStyle(
-                            color: Color(0xFF6F8094),
+                          style: TextStyle(
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
                           ),
@@ -811,17 +822,17 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFD9DEE5)),
+        border: Border.all(color: Theme.of(context).dividerColor),
       ),
-      child: const Column(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             'Start Service',
             style: TextStyle(
-              color: Color(0xFF1E2D3F),
+              color: Theme.of(context).colorScheme.onSurface,
               fontSize: 16,
               fontWeight: FontWeight.w700,
             ),
@@ -850,34 +861,41 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFD9DEE5)),
+        border: Border.all(color: Theme.of(context).dividerColor),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'EPF Document Upload',
             style: TextStyle(
-              color: Color(0xFF1E2D3F),
+              color: Theme.of(context).colorScheme.onSurface,
               fontSize: 16,
               fontWeight: FontWeight.w700,
             ),
           ),
           const SizedBox(height: 8),
-          const Text(
+          Text(
             'Upload your supporting documents before continuing with EPF services.',
-            style: TextStyle(color: Color(0xFF6F8094), fontSize: 12),
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              fontSize: 12,
+            ),
           ),
           const SizedBox(height: 14),
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: const Color(0xFFF5F8FC),
+              color: Theme.of(
+                context,
+              ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFDCE5F0)),
+              border: Border.all(
+                color: Theme.of(context).dividerColor.withValues(alpha: 0.5),
+              ),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -888,23 +906,25 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
                       width: 42,
                       height: 42,
                       decoration: BoxDecoration(
-                        color: const Color(0xFFE8F4FE),
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.primary.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: const Icon(
+                      child: Icon(
                         Icons.upload_file_outlined,
-                        color: Color(0xFF3DA5F5),
+                        color: Theme.of(context).colorScheme.primary,
                       ),
                     ),
                     const SizedBox(width: 12),
-                    const Expanded(
+                    Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
                             'Upload document',
                             style: TextStyle(
-                              color: Color(0xFF1E2D3F),
+                              color: Theme.of(context).colorScheme.onSurface,
                               fontSize: 14,
                               fontWeight: FontWeight.w700,
                             ),
@@ -913,7 +933,9 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
                           Text(
                             'PDF, JPG, PNG up to 10MB each. Scan clearly for faster verification.',
                             style: TextStyle(
-                              color: Color(0xFF607489),
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
                               fontSize: 12,
                             ),
                           ),
@@ -956,14 +978,18 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
                     vertical: 10,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: Theme.of(context).colorScheme.surface,
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: const Color(0xFFDCE5F0)),
+                    border: Border.all(
+                      color: Theme.of(
+                        context,
+                      ).dividerColor.withValues(alpha: 0.5),
+                    ),
                   ),
-                  child: const Text(
+                  child: Text(
                     'Accepted files: identification proof, employment letter, salary slip, EPF statement, or any supporting PDF/image.',
                     style: TextStyle(
-                      color: Color(0xFF6F8094),
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
                     ),
@@ -973,10 +999,10 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
             ),
           ),
           const SizedBox(height: 14),
-          const Text(
+          Text(
             'Suggested documents',
             style: TextStyle(
-              color: Color(0xFF1E2D3F),
+              color: Theme.of(context).colorScheme.onSurface,
               fontSize: 14,
               fontWeight: FontWeight.w700,
             ),
@@ -1061,17 +1087,17 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFD9E2EC)),
+        border: Border.all(color: Theme.of(context).dividerColor),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             title,
-            style: const TextStyle(
-              color: Color(0xFF1E2D3F),
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface,
               fontSize: 14,
               fontWeight: FontWeight.w700,
             ),
@@ -1117,34 +1143,41 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFD9DEE5)),
+        border: Border.all(color: Theme.of(context).dividerColor),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Health Service Registration',
             style: TextStyle(
-              color: Color(0xFF1E2D3F),
+              color: Theme.of(context).colorScheme.onSurface,
               fontSize: 16,
               fontWeight: FontWeight.w700,
             ),
           ),
           const SizedBox(height: 8),
-          const Text(
+          Text(
             'Upload supporting documents, then fill in the required health registration details manually.',
-            style: TextStyle(color: Color(0xFF6F8094), fontSize: 12),
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              fontSize: 12,
+            ),
           ),
           const SizedBox(height: 14),
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: const Color(0xFFF5F8FC),
+              color: Theme.of(
+                context,
+              ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFDCE5F0)),
+              border: Border.all(
+                color: Theme.of(context).dividerColor.withValues(alpha: 0.5),
+              ),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1155,23 +1188,25 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
                       width: 42,
                       height: 42,
                       decoration: BoxDecoration(
-                        color: const Color(0xFFE8F4FE),
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.primary.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: const Icon(
+                      child: Icon(
                         Icons.upload_file_outlined,
-                        color: Color(0xFF3DA5F5),
+                        color: Theme.of(context).colorScheme.primary,
                       ),
                     ),
                     const SizedBox(width: 12),
-                    const Expanded(
+                    Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
                             'Upload health document',
                             style: TextStyle(
-                              color: Color(0xFF1E2D3F),
+                              color: Theme.of(context).colorScheme.onSurface,
                               fontSize: 14,
                               fontWeight: FontWeight.w700,
                             ),
@@ -1180,7 +1215,9 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
                           Text(
                             'Medical card, referral letter, or previous reports (UI placeholder only).',
                             style: TextStyle(
-                              color: Color(0xFF607489),
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
                               fontSize: 12,
                             ),
                           ),
@@ -1224,14 +1261,18 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
                     vertical: 10,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: Theme.of(context).colorScheme.surface,
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: const Color(0xFFDCE5F0)),
+                    border: Border.all(
+                      color: Theme.of(
+                        context,
+                      ).dividerColor.withValues(alpha: 0.5),
+                    ),
                   ),
-                  child: const Text(
+                  child: Text(
                     'Accepted files: PDF, JPG, PNG (ID card, insurance card, medical report).',
                     style: TextStyle(
-                      color: Color(0xFF6F8094),
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
                     ),
@@ -1305,34 +1346,41 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFD9DEE5)),
+        border: Border.all(color: Theme.of(context).dividerColor),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'PTPTN Loan Payment',
             style: TextStyle(
-              color: Color(0xFF1E2D3F),
+              color: Theme.of(context).colorScheme.onSurface,
               fontSize: 16,
               fontWeight: FontWeight.w700,
             ),
           ),
           const SizedBox(height: 8),
-          const Text(
+          Text(
             'Upload supporting documents and fill in payment details manually.',
-            style: TextStyle(color: Color(0xFF6F8094), fontSize: 12),
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              fontSize: 12,
+            ),
           ),
           const SizedBox(height: 14),
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: const Color(0xFFF5F8FC),
+              color: Theme.of(
+                context,
+              ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFDCE5F0)),
+              border: Border.all(
+                color: Theme.of(context).dividerColor.withValues(alpha: 0.5),
+              ),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1343,23 +1391,25 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
                       width: 42,
                       height: 42,
                       decoration: BoxDecoration(
-                        color: const Color(0xFFE8F4FE),
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.primary.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: const Icon(
+                      child: Icon(
                         Icons.upload_file_outlined,
-                        color: Color(0xFF3DA5F5),
+                        color: Theme.of(context).colorScheme.primary,
                       ),
                     ),
                     const SizedBox(width: 12),
-                    const Expanded(
+                    Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
                             'Upload payment document',
                             style: TextStyle(
-                              color: Color(0xFF1E2D3F),
+                              color: Theme.of(context).colorScheme.onSurface,
                               fontSize: 14,
                               fontWeight: FontWeight.w700,
                             ),
@@ -1368,7 +1418,9 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
                           Text(
                             'Optional: PTPTN statement, previous receipt, or payment reference slip.',
                             style: TextStyle(
-                              color: Color(0xFF607489),
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
                               fontSize: 12,
                             ),
                           ),
@@ -1411,14 +1463,18 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
                     vertical: 10,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: Theme.of(context).colorScheme.surface,
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: const Color(0xFFDCE5F0)),
+                    border: Border.all(
+                      color: Theme.of(
+                        context,
+                      ).dividerColor.withValues(alpha: 0.5),
+                    ),
                   ),
-                  child: const Text(
+                  child: Text(
                     'Accepted files: PDF, JPG, PNG. UI only (no backend upload).',
                     style: TextStyle(
-                      color: Color(0xFF6F8094),
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
                     ),
@@ -1488,34 +1544,41 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFD9DEE5)),
+        border: Border.all(color: Theme.of(context).dividerColor),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Licence Renewal',
             style: TextStyle(
-              color: Color(0xFF1E2D3F),
+              color: Theme.of(context).colorScheme.onSurface,
               fontSize: 16,
               fontWeight: FontWeight.w700,
             ),
           ),
           const SizedBox(height: 8),
-          const Text(
+          Text(
             'Upload your photo or use the existing JPJ photo, then complete the renewal details below.',
-            style: TextStyle(color: Color(0xFF6F8094), fontSize: 12),
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              fontSize: 12,
+            ),
           ),
           const SizedBox(height: 14),
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: const Color(0xFFF5F8FC),
+              color: Theme.of(
+                context,
+              ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFDCE5F0)),
+              border: Border.all(
+                color: Theme.of(context).dividerColor.withValues(alpha: 0.5),
+              ),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1526,23 +1589,25 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
                       width: 42,
                       height: 42,
                       decoration: BoxDecoration(
-                        color: const Color(0xFFE8F4FE),
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.primary.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: const Icon(
+                      child: Icon(
                         Icons.photo_camera_outlined,
-                        color: Color(0xFF3DA5F5),
+                        color: Theme.of(context).colorScheme.primary,
                       ),
                     ),
                     const SizedBox(width: 12),
-                    const Expanded(
+                    Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
                             'Photo upload / existing photo',
                             style: TextStyle(
-                              color: Color(0xFF1E2D3F),
+                              color: Theme.of(context).colorScheme.onSurface,
                               fontSize: 14,
                               fontWeight: FontWeight.w700,
                             ),
@@ -1551,7 +1616,9 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
                           Text(
                             'Passport-style photo or existing JPJ photo placeholder (UI only).',
                             style: TextStyle(
-                              color: Color(0xFF607489),
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
                               fontSize: 12,
                             ),
                           ),
@@ -1568,7 +1635,7 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
                   width: double.infinity,
                   height: 42,
                   child: OutlinedButton.icon(
-                    onPressed: () => uploadDocument("jpj"), 
+                    onPressed: () => uploadDocument("jpj"),
                     icon: const Icon(Icons.file_upload_outlined),
                     label: const Text('Upload Photo'),
                   ),
@@ -1610,14 +1677,18 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
                     vertical: 10,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: Theme.of(context).colorScheme.surface,
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: const Color(0xFFDCE5F0)),
+                    border: Border.all(
+                      color: Theme.of(
+                        context,
+                      ).dividerColor.withValues(alpha: 0.5),
+                    ),
                   ),
-                  child: const Text(
+                  child: Text(
                     'Accepted files: JPG, PNG, PDF for supporting documents. UI placeholder only.',
                     style: TextStyle(
-                      color: Color(0xFF6F8094),
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
                     ),
@@ -1680,195 +1751,210 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
   }
 
   Widget _buildSummonsPaymentForm() {
-  return Container(
-    width: double.infinity,
-    padding: const EdgeInsets.all(14),
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(12),
-      border: Border.all(color: const Color(0xFFD9DEE5)),
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Summons Payment',
-          style: TextStyle(
-            color: Color(0xFF1E2D3F),
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Theme.of(context).dividerColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Summons Payment',
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface,
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+            ),
           ),
-        ),
-        const SizedBox(height: 8),
-        const Text(
-          'Enter your identification details to auto-fetch summons records, then complete the payment UI below.',
-          style: TextStyle(color: Color(0xFF6F8094), fontSize: 12),
-        ),
-
-        const SizedBox(height: 14),
-
-        // ===== UPLOAD CARD (ONLY ONE - FIXED) =====
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: const Color(0xFFF5F8FC),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFDCE5F0)),
+          const SizedBox(height: 8),
+          Text(
+            'Enter your identification details to auto-fetch summons records, then complete the payment UI below.',
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              fontSize: 12,
+            ),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    width: 42,
-                    height: 42,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFE8F4FE),
-                      borderRadius: BorderRadius.circular(12),
+
+          const SizedBox(height: 14),
+
+          // ===== UPLOAD CARD (ONLY ONE - FIXED) =====
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Theme.of(
+                context,
+              ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: Theme.of(context).dividerColor.withValues(alpha: 0.5),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.primary.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        Icons.upload_file_outlined,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
                     ),
-                    child: const Icon(
-                      Icons.upload_file_outlined,
-                      color: Color(0xFF3DA5F5),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  const Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Summons lookup document',
-                          style: TextStyle(
-                            color: Color(0xFF1E2D3F),
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Summons lookup document',
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.onSurface,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
-                        ),
-                        SizedBox(height: 2),
-                        Text(
-                          'Optional document upload placeholder for summons notice or related file.',
-                          style: TextStyle(
-                            color: Color(0xFF607489),
-                            fontSize: 12,
+                          SizedBox(height: 2),
+                          Text(
+                            'Optional document upload placeholder for summons notice or related file.',
+                            style: TextStyle(
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
+                              fontSize: 12,
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 12),
+
+                // Upload button
+                SizedBox(
+                  width: double.infinity,
+                  height: 42,
+                  child: OutlinedButton.icon(
+                    onPressed: () => uploadDocument("pdrm"),
+                    icon: const Icon(Icons.file_upload_outlined),
+                    label: const Text('Upload Summons Document'),
+                  ),
+                ),
+
+                const SizedBox(height: 8),
+
+                // AI autofill button
+                SizedBox(
+                  width: double.infinity,
+                  height: 42,
+                  child: FilledButton.icon(
+                    onPressed: fillWithAI,
+                    icon: const Icon(Icons.auto_awesome),
+                    label: const Text('Auto Fill with AI'),
+                  ),
+                ),
+
+                const SizedBox(height: 10),
+
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surface,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: Theme.of(
+                        context,
+                      ).dividerColor.withValues(alpha: 0.5),
                     ),
                   ),
-                ],
-              ),
-
-              const SizedBox(height: 12),
-
-              // Upload button
-              SizedBox(
-                width: double.infinity,
-                height: 42,
-                child: OutlinedButton.icon(
-                  onPressed: () => uploadDocument("pdrm"),
-                  icon: const Icon(Icons.file_upload_outlined),
-                  label: const Text('Upload Summons Document'),
-                ),
-              ),
-
-              const SizedBox(height: 8),
-
-              // AI autofill button
-              SizedBox(
-                width: double.infinity,
-                height: 42,
-                child: FilledButton.icon(
-                  onPressed: fillWithAI,
-                  icon: const Icon(Icons.auto_awesome),
-                  label: const Text('Auto Fill with AI'),
-                ),
-              ),
-
-              const SizedBox(height: 10),
-
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 10,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0xFFDCE5F0)),
-                ),
-                child: const Text(
-                  'Accepted files: summons notice, notice image, or supporting PDF/image.',
-                  style: TextStyle(
-                    color: Color(0xFF6F8094),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
+                  child: Text(
+                    'Accepted files: summons notice, notice image, or supporting PDF/image.',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
 
-        const SizedBox(height: 14),
+          const SizedBox(height: 14),
 
-        // ===== REST OF YOUR FORM (UNCHANGED) =====
-        _buildInfoSection('1. Identification (VERY IMPORTANT)', [
-          _buildInfoField('IC Number (MyKad)'),
-          _buildInfoField('Vehicle Plate Number'),
-          _buildInfoField('Summons Number (best & most accurate)'),
-        ]),
-        _buildInfoSection('2. Summons Details (Auto-Fetched)', [
-          _buildInfoField('Summons Number'),
-          _buildInfoField('Offence Type (speeding, parking, etc.)'),
-          _buildInfoPair(
-            'Date & Location of Offence',
-            'Issuing Authority (PDRM / JPJ / council)',
-          ),
-          _buildInfoPair(
-            'Amount to Pay',
-            'Status (unpaid / discounted / overdue)',
-          ),
-        ]),
-        _buildInfoSection('3. Contact Information', [
-          _buildInfoPair('Phone Number', 'Email'),
-        ]),
-        _buildInfoSection('4. Payment Information', [
-          _buildInfoField('Payment Amount (auto or editable)'),
-          _buildInfoField('Payment Type (single summons / multiple summons)'),
-          _buildInfoField('Payment Method (FPX / card / e-wallet)'),
-        ]),
-        _buildInfoSection('5. Transaction Details', [
-          _buildInfoPair('Payment Date', 'Reference Number'),
-          _buildInfoField('Transaction ID'),
-        ]),
-        _buildInfoSection('6. Verification / Security', [
-          _buildInfoField('Login (optional but recommended)'),
-          _buildInfoField('OTP / TAC Verification'),
-        ]),
-        _buildInfoSection('7. Confirmation & Receipt', [
-          _buildInfoField('Payment Summary Before Confirm'),
-          _buildInfoField('Digital Receipt After Payment'),
-          _buildInfoField('Updated Status (paid)'),
-        ]),
-        _buildInfoSection('Important Checks', [
-          _buildInfoField('Correct summons selected (if multiple)'),
-          _buildInfoField('Amount matches official record'),
-          _buildInfoField('Check discount campaigns / promotions'),
-        ]),
-        _buildInfoSection('MVP Quick Pay', [
-          _buildInfoField('IC / Plate / Summons Number'),
-          _buildInfoField('Auto-fetch summons info (placeholder)'),
-          _buildInfoField('Enter Amount'),
-          _buildInfoField('Choose Payment Method'),
-          _buildInfoField('Confirm & Pay'),
-        ]),
-      ],
-    ),
-  );
-}
+          // ===== REST OF YOUR FORM (UNCHANGED) =====
+          _buildInfoSection('1. Identification (VERY IMPORTANT)', [
+            _buildInfoField('IC Number (MyKad)'),
+            _buildInfoField('Vehicle Plate Number'),
+            _buildInfoField('Summons Number (best & most accurate)'),
+          ]),
+          _buildInfoSection('2. Summons Details (Auto-Fetched)', [
+            _buildInfoField('Summons Number'),
+            _buildInfoField('Offence Type (speeding, parking, etc.)'),
+            _buildInfoPair(
+              'Date & Location of Offence',
+              'Issuing Authority (PDRM / JPJ / council)',
+            ),
+            _buildInfoPair(
+              'Amount to Pay',
+              'Status (unpaid / discounted / overdue)',
+            ),
+          ]),
+          _buildInfoSection('3. Contact Information', [
+            _buildInfoPair('Phone Number', 'Email'),
+          ]),
+          _buildInfoSection('4. Payment Information', [
+            _buildInfoField('Payment Amount (auto or editable)'),
+            _buildInfoField('Payment Type (single summons / multiple summons)'),
+            _buildInfoField('Payment Method (FPX / card / e-wallet)'),
+          ]),
+          _buildInfoSection('5. Transaction Details', [
+            _buildInfoPair('Payment Date', 'Reference Number'),
+            _buildInfoField('Transaction ID'),
+          ]),
+          _buildInfoSection('6. Verification / Security', [
+            _buildInfoField('Login (optional but recommended)'),
+            _buildInfoField('OTP / TAC Verification'),
+          ]),
+          _buildInfoSection('7. Confirmation & Receipt', [
+            _buildInfoField('Payment Summary Before Confirm'),
+            _buildInfoField('Digital Receipt After Payment'),
+            _buildInfoField('Updated Status (paid)'),
+          ]),
+          _buildInfoSection('Important Checks', [
+            _buildInfoField('Correct summons selected (if multiple)'),
+            _buildInfoField('Amount matches official record'),
+            _buildInfoField('Check discount campaigns / promotions'),
+          ]),
+          _buildInfoSection('MVP Quick Pay', [
+            _buildInfoField('IC / Plate / Summons Number'),
+            _buildInfoField('Auto-fetch summons info (placeholder)'),
+            _buildInfoField('Enter Amount'),
+            _buildInfoField('Choose Payment Method'),
+            _buildInfoField('Confirm & Pay'),
+          ]),
+        ],
+      ),
+    );
+  }
 
   Widget _buildDocumentChip(String label) {
     return Container(
@@ -1876,9 +1962,9 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: const Color(0xFFF7F8FA),
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFFD9DEE5)),
+        border: Border.all(color: Theme.of(context).dividerColor),
       ),
       child: Row(
         children: [
@@ -1886,12 +1972,14 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
             width: 28,
             height: 28,
             decoration: BoxDecoration(
-              color: const Color(0xFFE8F4FE),
+              color: Theme.of(
+                context,
+              ).colorScheme.primary.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: const Icon(
+            child: Icon(
               Icons.description_outlined,
-              color: Color(0xFF3DA5F5),
+              color: Theme.of(context).colorScheme.primary,
               size: 16,
             ),
           ),
@@ -1899,8 +1987,8 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
           Expanded(
             child: Text(
               label,
-              style: const TextStyle(
-                color: Color(0xFF1E2D3F),
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurface,
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
               ),
@@ -1926,19 +2014,19 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFD9DEE5)),
+        border: Border.all(color: Theme.of(context).dividerColor),
       ),
       child: Form(
         key: _formKey,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'Tax Payment Details',
               style: TextStyle(
-                color: Color(0xFF1E2D3F),
+                color: Theme.of(context).colorScheme.onSurface,
                 fontSize: 16,
                 fontWeight: FontWeight.w700,
               ),
@@ -1948,9 +2036,13 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
               width: double.infinity,
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: const Color(0xFFF5F8FC),
+                color: Theme.of(
+                  context,
+                ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFFDCE5F0)),
+                border: Border.all(
+                  color: Theme.of(context).dividerColor.withValues(alpha: 0.5),
+                ),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1962,23 +2054,25 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
                         width: 40,
                         height: 40,
                         decoration: BoxDecoration(
-                          color: const Color(0xFFE8F4FE),
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.primary.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(10),
                         ),
-                        child: const Icon(
+                        child: Icon(
                           Icons.upload_file_outlined,
-                          color: Color(0xFF3DA5F5),
+                          color: Theme.of(context).colorScheme.primary,
                         ),
                       ),
                       const SizedBox(width: 10),
-                      const Expanded(
+                      Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
                               'Tax Document & AI Autofill',
                               style: TextStyle(
-                                color: Color(0xFF1E2D3F),
+                                color: Theme.of(context).colorScheme.onSurface,
                                 fontSize: 14,
                                 fontWeight: FontWeight.w700,
                               ),
@@ -1987,7 +2081,9 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
                             Text(
                               'Upload document or use AI to auto-fill form fields',
                               style: TextStyle(
-                                color: Color(0xFF607489),
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
                                 fontSize: 12,
                               ),
                             ),
@@ -2033,14 +2129,18 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
                       vertical: 10,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: Theme.of(context).colorScheme.surface,
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: const Color(0xFFDCE5F0)),
+                      border: Border.all(
+                        color: Theme.of(
+                          context,
+                        ).dividerColor.withValues(alpha: 0.5),
+                      ),
                     ),
-                    child: const Text(
+                    child: Text(
                       'Upload: PDF, image, or document\nAuto Fill: uses AI to prefill tax form fields',
                       style: TextStyle(
-                        color: Color(0xFF6F8094),
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                       ),
@@ -2055,9 +2155,12 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
               style: TextStyle(fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 4),
-            const Text(
+            Text(
               'Your personal tax number (e.g. SGXXXXXXXX / OGXXXXXXXX).',
-              style: TextStyle(color: Color(0xFF6F8094), fontSize: 12),
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                fontSize: 12,
+              ),
             ),
             const SizedBox(height: 8),
             TextFormField(
@@ -2076,9 +2179,12 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
               style: TextStyle(fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 4),
-            const Text(
+            Text(
               'Use IC (MyKad) for Malaysians or Passport for foreigners.',
-              style: TextStyle(color: Color(0xFF6F8094), fontSize: 12),
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                fontSize: 12,
+              ),
             ),
             const SizedBox(height: 8),
             TextFormField(
@@ -2124,9 +2230,12 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
               style: TextStyle(fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 4),
-            const Text(
+            Text(
               'Wrong year can result in incorrect payment records.',
-              style: TextStyle(color: Color(0xFF6F8094), fontSize: 12),
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                fontSize: 12,
+              ),
             ),
             const SizedBox(height: 8),
             DropdownButtonFormField<String>(
@@ -2154,9 +2263,12 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
               style: TextStyle(fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 4),
-            const Text(
+            Text(
               '084 is commonly used for balance of tax payment.',
-              style: TextStyle(color: Color(0xFF6F8094), fontSize: 12),
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                fontSize: 12,
+              ),
             ),
             const SizedBox(height: 8),
             DropdownButtonFormField<String>(
@@ -2217,20 +2329,21 @@ class _ServiceActionPageState extends State<_ServiceActionPage> {
   }
 }
 
-class _ServiceItem {
-  const _ServiceItem({
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-    required this.iconColor,
-    required this.iconBg,
-  });
-
+class ServiceItem {
   final String title;
   final String subtitle;
   final IconData icon;
-  final Color iconColor;
   final Color iconBg;
+  final Color iconColor;
+
+  // Ensure 'title' and others do NOT have underscores here
+  ServiceItem({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.iconBg,
+    required this.iconColor,
+  });
 }
 
 const Map<String, List<String>> _subServiceMap = {
@@ -2245,93 +2358,96 @@ const Map<String, List<String>> _subServiceMap = {
   'Summons Payment': ['Check Summons', 'Pay Traffic Fine'],
 };
 
-const List<_ServiceItem> _popularItems = [
-  _ServiceItem(
+// 1. Updated Popular Items List
+// Removed 'const' and corrected the class name to ServiceItem
+final List<ServiceItem> _popularItems = [
+  ServiceItem(
     title: 'Tax Filing',
     subtitle: 'LHDN / MyTax',
     icon: Icons.attach_money,
-    iconColor: Color(0xFF2ECC71),
-    iconBg: Color(0xFFE8F6EE),
+    iconColor: const Color(0xFF2ECC71),
+    iconBg: const Color(0xFFE8F6EE),
   ),
-  _ServiceItem(
+  ServiceItem(
     title: 'EPF Management',
     subtitle: 'KWSP',
     icon: Icons.account_balance,
-    iconColor: Color(0xFF3DA5F5),
-    iconBg: Color(0xFFE8F4FE),
+    iconColor: const Color(0xFF3DA5F5),
+    iconBg: const Color(0xFFE8F4FE),
   ),
-  _ServiceItem(
+  ServiceItem(
     title: 'Health Services',
     subtitle: 'KKM',
     icon: Icons.favorite_border,
-    iconColor: Color(0xFFF5A623),
-    iconBg: Color(0xFFFFF3E6),
+    iconColor: const Color(0xFFF5A623),
+    iconBg: const Color(0xFFFFF3E6),
   ),
-  _ServiceItem(
+  ServiceItem(
     title: 'Loan Payment',
     subtitle: 'PTPTN',
     icon: Icons.school_outlined,
-    iconColor: Color(0xFFE57373),
-    iconBg: Color(0xFFFDEDEE),
+    iconColor: const Color(0xFFE57373),
+    iconBg: const Color(0xFFFDEDEE),
   ),
-  _ServiceItem(
+  ServiceItem(
     title: 'License Renewal',
     subtitle: 'JPJ',
     icon: Icons.directions_car_outlined,
-    iconColor: Color(0xFF607489),
-    iconBg: Color(0xFFE9EDF2),
+    iconColor: const Color(0xFF607489),
+    iconBg: const Color(0xFFE9EDF2),
   ),
-  _ServiceItem(
+  ServiceItem(
     title: 'Summons Payment',
     subtitle: 'PDRM',
     icon: Icons.warning_amber_outlined,
-    iconColor: Color(0xFFF5A623),
-    iconBg: Color(0xFFFFF3E6),
+    iconColor: const Color(0xFFF5A623),
+    iconBg: const Color(0xFFFFF3E6),
   ),
 ];
 
-const List<_ServiceItem> _allItems = [
-  _ServiceItem(
+// 2. Updated All Items List
+final List<ServiceItem> _allItems = [
+  ServiceItem(
     title: 'Birth Certificate',
     subtitle: 'JPN',
     icon: Icons.description_outlined,
-    iconColor: Color(0xFF7D8D9D),
-    iconBg: Color(0xFFE9EDF2),
+    iconColor: const Color(0xFF7D8D9D),
+    iconBg: const Color(0xFFE9EDF2),
   ),
-  _ServiceItem(
+  ServiceItem(
     title: 'Housing Application',
     subtitle: 'PR1MA',
     icon: Icons.home_outlined,
-    iconColor: Color(0xFF7D8D9D),
-    iconBg: Color(0xFFE9EDF2),
+    iconColor: const Color(0xFF7D8D9D),
+    iconBg: const Color(0xFFE9EDF2),
   ),
-  _ServiceItem(
+  ServiceItem(
     title: 'Social Welfare',
     subtitle: 'JKM',
     icon: Icons.people_outline,
-    iconColor: Color(0xFF7D8D9D),
-    iconBg: Color(0xFFE9EDF2),
+    iconColor: const Color(0xFF7D8D9D),
+    iconBg: const Color(0xFFE9EDF2),
   ),
-  _ServiceItem(
+  ServiceItem(
     title: 'Business Registration',
     subtitle: 'SSM',
     icon: Icons.work_outline,
-    iconColor: Color(0xFF7D8D9D),
-    iconBg: Color(0xFFE9EDF2),
+    iconColor: const Color(0xFF7D8D9D),
+    iconBg: const Color(0xFFE9EDF2),
   ),
-  _ServiceItem(
+  ServiceItem(
     title: 'Legal Aid',
     subtitle: 'BHEUU',
     icon: Icons.balance_outlined,
-    iconColor: Color(0xFF7D8D9D),
-    iconBg: Color(0xFFE9EDF2),
+    iconColor: const Color(0xFF7D8D9D),
+    iconBg: const Color(0xFFE9EDF2),
   ),
-  _ServiceItem(
+  ServiceItem(
     title: 'Passport Renewal',
     subtitle: 'JIM',
     icon: Icons.flight_outlined,
-    iconColor: Color(0xFF7D8D9D),
-    iconBg: Color(0xFFE9EDF2),
+    iconColor: const Color(0xFF7D8D9D),
+    iconBg: const Color(0xFFE9EDF2),
   ),
 ];
 

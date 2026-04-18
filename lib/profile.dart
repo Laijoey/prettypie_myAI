@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'chat_assistant_fab.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'chat_assistant_fab.dart'; // Ensure this import matches your project
 
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
@@ -18,11 +18,11 @@ class ProfilePage extends StatelessWidget {
             borderRadius: BorderRadius.circular(12),
             child: Row(
               children: [
-                SizedBox(width: 220, child: _ProfileSidebar()),
+                const SizedBox(width: 220, child: _ProfileSidebar()),
                 Expanded(
                   child: ColoredBox(
                     color: theme.scaffoldBackgroundColor,
-                    child: _ProfileBody(),
+                    child: const _ProfileBody(),
                   ),
                 ),
               ],
@@ -50,6 +50,9 @@ class _ProfileSidebar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Helper to get the current UID to pass along during sidebar navigation
+    final currentUid = ModalRoute.of(context)?.settings.arguments as String?;
+
     return Container(
       color: const Color(0xFF214B74),
       child: Column(
@@ -128,35 +131,17 @@ class _ProfileSidebar extends StatelessWidget {
                         ),
                       ),
                       onTap: () {
+                        final String route =
+                            '/${item.title.toLowerCase().replaceAll(' ', '')}';
                         if (item.title == 'Dashboard') {
+                          Navigator.of(context).pushReplacementNamed(
+                            '/dashboard',
+                            arguments: currentUid,
+                          );
+                        } else if (!item.active) {
                           Navigator.of(
                             context,
-                          ).pushReplacementNamed('/dashboard');
-                        }
-                        if (item.title == 'Services') {
-                          Navigator.of(
-                            context,
-                          ).pushReplacementNamed('/services');
-                        }
-                        if (item.title == 'My Applications') {
-                          Navigator.of(
-                            context,
-                          ).pushReplacementNamed('/applications');
-                        }
-                        if (item.title == 'Payments') {
-                          Navigator.of(
-                            context,
-                          ).pushReplacementNamed('/payments');
-                        }
-                        if (item.title == 'Notifications') {
-                          Navigator.of(
-                            context,
-                          ).pushReplacementNamed('/notifications');
-                        }
-                        if (item.title == 'Settings') {
-                          Navigator.of(
-                            context,
-                          ).pushReplacementNamed('/settings');
+                          ).pushReplacementNamed(route, arguments: currentUid);
                         }
                       },
                     ),
@@ -165,21 +150,31 @@ class _ProfileSidebar extends StatelessWidget {
               },
             ),
           ),
-          const Padding(
-            padding: EdgeInsets.fromLTRB(18, 4, 18, 16),
-            child: Row(
-              children: [
-                Icon(Icons.logout, color: Color(0xFFC2D1DF)),
-                SizedBox(width: 10),
-                Text(
-                  'Logout',
-                  style: TextStyle(
-                    color: Color(0xFFC2D1DF),
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 4, 18, 16),
+            child: InkWell(
+              onTap: () async {
+                await FirebaseAuth.instance.signOut();
+
+                // IMPORTANT: clear navigation stack
+                Navigator.of(
+                  context,
+                ).pushNamedAndRemoveUntil('/login', (route) => false);
+              },
+              child: const Row(
+                children: [
+                  Icon(Icons.logout, color: Color(0xFFC2D1DF)),
+                  SizedBox(width: 10),
+                  Text(
+                    'Logout',
+                    style: TextStyle(
+                      color: Color(0xFFC2D1DF),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ],
@@ -200,7 +195,8 @@ class _ProfileBodyState extends State<_ProfileBody> {
   Map<String, dynamic>? profile;
   List<Map<String, dynamic>> docs = [];
 
-  // ================= CONTROLLERS =================
+  String? _activeUid; // Use this instead of FirebaseAuth.instance
+
   final nameController = TextEditingController();
   final icController = TextEditingController();
   final phoneController = TextEditingController();
@@ -208,40 +204,53 @@ class _ProfileBodyState extends State<_ProfileBody> {
   final addressController = TextEditingController();
 
   bool isLoading = true;
-
-  // ================= PRIVACY =================
   bool lhdn = true;
   bool kwsp = true;
   bool padu = false;
 
   @override
-  void initState() {
-    super.initState();
-    _loadProfile();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    // Get UID from Login/Dashboard arguments
+    final String? args = ModalRoute.of(context)?.settings.arguments as String?;
+    // Fallback order: Arguments -> Auth -> Kelvin Demo ID
+    _activeUid =
+        args ??
+        FirebaseAuth.instance.currentUser?.uid ??
+        "QkP13R7eWNUB2yeLlJUBFqVXBHv2";
+
+    if (isLoading) {
+      _loadProfile();
+    }
   }
 
-  // ================= LOAD FIREBASE =================
   Future<void> _loadProfile() async {
-    profile = await repo.getUserProfile();
-    docs = await repo.getUserDocuments();
+    if (_activeUid == null) return;
 
-    nameController.text = profile?['name'] ?? '';
-    icController.text = profile?['ic'] ?? '';
-    phoneController.text = profile?['phone'] ?? '';
-    emailController.text = profile?['email'] ?? '';
-    addressController.text = profile?['address'] ?? '';
+    // Assuming your ProfileRepository methods take a UID
+    profile = await repo.getUserProfile(_activeUid!);
+    docs = await repo.getUserDocuments(_activeUid!);
 
-    lhdn = profile?['share_lhdn'] ?? true;
-    kwsp = profile?['share_kwsp'] ?? true;
-    padu = profile?['share_padu'] ?? false;
+    if (profile != null) {
+      nameController.text = profile?['name'] ?? '';
+      icController.text = profile?['ic'] ?? '';
+      phoneController.text = profile?['phone'] ?? '';
+      emailController.text = profile?['email'] ?? '';
+      addressController.text = profile?['address'] ?? '';
 
-    setState(() => isLoading = false);
+      lhdn = profile?['share_lhdn'] ?? true;
+      kwsp = profile?['share_kwsp'] ?? true;
+      padu = profile?['share_padu'] ?? false;
+    }
+
+    if (mounted) setState(() => isLoading = false);
   }
 
-  // ================= SAVE FIREBASE =================
   Future<void> _saveProfile() async {
+    if (_activeUid == null) return;
 
-    await repo.updateProfile({
+    await repo.updateProfile(_activeUid!, {
       'name': nameController.text,
       'ic': icController.text,
       'phone': phoneController.text,
@@ -252,12 +261,13 @@ class _ProfileBodyState extends State<_ProfileBody> {
       'share_padu': padu,
     });
 
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Profile updated')));
+    if (mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Profile updated')));
+    }
   }
 
-  // ================= EDIT DIALOG =================
   void _openEditDialog() {
     final tempName = TextEditingController(text: nameController.text);
     final tempIc = TextEditingController(text: icController.text);
@@ -288,7 +298,6 @@ class _ProfileBodyState extends State<_ProfileBody> {
           ),
           ElevatedButton(
             onPressed: () async {
-              // ✅ update controllers ONLY after save
               nameController.text = tempName.text;
               icController.text = tempIc.text;
               phoneController.text = tempPhone.text;
@@ -296,9 +305,10 @@ class _ProfileBodyState extends State<_ProfileBody> {
               addressController.text = tempAddress.text;
 
               await _saveProfile();
-
-              Navigator.pop(context);
-              setState(() {});
+              if (mounted) {
+                Navigator.pop(context);
+                setState(() {});
+              }
             },
             child: const Text("Save"),
           ),
@@ -317,7 +327,6 @@ class _ProfileBodyState extends State<_ProfileBody> {
     );
   }
 
-  // ================= UI =================
   @override
   Widget build(BuildContext context) {
     if (isLoading) {
@@ -337,10 +346,8 @@ class _ProfileBodyState extends State<_ProfileBody> {
               fontWeight: FontWeight.w700,
             ),
           ),
-
           const SizedBox(height: 14),
-
-          // ================= PROFILE CARD =================
+          // Profile Card Container
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
@@ -378,9 +385,7 @@ class _ProfileBodyState extends State<_ProfileBody> {
                     ),
                   ],
                 ),
-
                 const SizedBox(height: 12),
-
                 Align(
                   alignment: Alignment.centerRight,
                   child: TextButton(
@@ -388,7 +393,6 @@ class _ProfileBodyState extends State<_ProfileBody> {
                     child: const Text("Edit"),
                   ),
                 ),
-
                 Row(
                   children: [
                     Expanded(
@@ -414,9 +418,7 @@ class _ProfileBodyState extends State<_ProfileBody> {
               ],
             ),
           ),
-
           const SizedBox(height: 14),
-
           Row(
             children: [
               const Expanded(child: _DocumentVaultCard()),
@@ -424,9 +426,7 @@ class _ProfileBodyState extends State<_ProfileBody> {
               const Expanded(child: _LinkedServicesCard()),
             ],
           ),
-
           const SizedBox(height: 14),
-
           Row(
             children: [
               const Expanded(child: _PaymentHistoryCard()),
@@ -953,29 +953,34 @@ class ProfileRepository {
   final _db = FirebaseFirestore.instance;
   final _auth = FirebaseAuth.instance;
 
-  Future<Map<String, dynamic>> getUserProfile() async {
-    final uid = _auth.currentUser!.uid;
+  // ✅ Added String? uid parameter
+  Future<Map<String, dynamic>> getUserProfile([String? uid]) async {
+    // If uid is provided (QR Demo), use it. Otherwise, use Auth (Manual).
+    final targetUid = uid ?? _auth.currentUser?.uid;
 
-    final doc = await _db.collection('users').doc(uid).get();
+    if (targetUid == null) return {};
 
+    final doc = await _db.collection('users').doc(targetUid).get();
     return doc.data() ?? {};
   }
 
-  Future<List<Map<String, dynamic>>> getUserDocuments() async {
-    final uid = _auth.currentUser!.uid;
+  // ✅ Added String? uid parameter
+  Future<List<Map<String, dynamic>>> getUserDocuments([String? uid]) async {
+    final targetUid = uid ?? _auth.currentUser?.uid;
+
+    if (targetUid == null) return [];
 
     final snapshot = await _db
         .collection('users')
-        .doc(uid)
+        .doc(targetUid)
         .collection('documents')
         .get();
 
     return snapshot.docs.map((d) => d.data()).toList();
   }
 
-  Future<void> updateProfile(Map<String, dynamic> data) async {
-    final uid = _auth.currentUser!.uid;
-
+  // ✅ Added String? uid parameter
+  Future<void> updateProfile(String uid, Map<String, dynamic> data) async {
     await _db.collection('users').doc(uid).set({
       ...data,
       'updatedAt': FieldValue.serverTimestamp(),
