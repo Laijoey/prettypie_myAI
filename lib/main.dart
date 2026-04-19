@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'dart:math' as math;
 import 'chat_assistant_fab.dart';
 import 'service.dart';
 import 'application.dart';
@@ -164,29 +163,16 @@ class LoginPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFEDEDED),
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          final isDesktop = constraints.maxWidth >= 1100;
-          final panelHeight = math.min(760.0, constraints.maxHeight - 24);
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(6),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final isDesktop = constraints.maxWidth >= 1100;
 
-          return Center(
-            child: Container(
-              margin: const EdgeInsets.all(12),
-              constraints: const BoxConstraints(maxWidth: 1700),
-              height: panelHeight,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Color(0x1A000000),
-                    blurRadius: 22,
-                    offset: Offset(0, 8),
-                  ),
-                ],
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: isDesktop
+                return isDesktop
                     ? const Row(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
@@ -194,11 +180,11 @@ class LoginPage extends StatelessWidget {
                           Expanded(flex: 1, child: _LoginPanel()),
                         ],
                       )
-                    : const _LoginPanel(),
-              ),
+                    : const _LoginPanel();
+              },
             ),
-          );
-        },
+          ),
+        ),
       ),
     );
   }
@@ -351,8 +337,8 @@ class _LoginPanelState extends State<_LoginPanel> {
     );
   }
 
-  void _openDashboard(String userId) {
-    Navigator.of(context).pushReplacementNamed('/dashboard', arguments: userId);
+  void _openDashboard() {
+    Navigator.of(context).pushReplacementNamed('/dashboard');
   }
 
   Future<void> loginWithQr(String userId) async {
@@ -368,7 +354,7 @@ class _LoginPanelState extends State<_LoginPanel> {
         ).showSnackBar(const SnackBar(content: Text('Invalid QR User')));
         return;
       }
-      _openDashboard(userId);
+      _openDashboard();
     } catch (e) {
       ScaffoldMessenger.of(
         context,
@@ -403,7 +389,7 @@ class _LoginPanelState extends State<_LoginPanel> {
 
       if (mounted) {
         Navigator.pop(context); // Close Popup
-        _openDashboard(kelvinUid); // Go straight to Kelvin's profile
+        _openDashboard(); // Go straight to Kelvin's profile
       }
     });
   }
@@ -417,7 +403,7 @@ class _LoginPanelState extends State<_LoginPanel> {
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 520),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 18),
+              padding: const EdgeInsets.fromLTRB(32, 72, 32, 24),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -581,7 +567,7 @@ class _LoginPanelState extends State<_LoginPanel> {
                             ).loadThemeFromFirestore();
                             final uid =
                                 FirebaseAuth.instance.currentUser?.uid ?? phone;
-                            _openDashboard(uid);
+                            _openDashboard();
                           } else {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(content: Text('Invalid OTP')),
@@ -734,7 +720,7 @@ class _LoginPanelState extends State<_LoginPanel> {
                     listen: false,
                   ).loadThemeFromFirestore();
                   final uid = FirebaseAuth.instance.currentUser?.uid ?? input;
-                  _openDashboard(uid);
+                  _openDashboard();
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('Invalid credentials')),

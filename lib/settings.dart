@@ -220,6 +220,10 @@ class _SettingsBodyState extends State<_SettingsBody> {
   String? _uid;
 
   // ================= STATE =================
+  String? _selectedLanguage = 'English (Malaysia)';
+  String? _selectedRegion = 'Kuala Lumpur';
+  String? _selectedAccountType = 'Citizen';
+
   bool _biometricLogin = true;
   bool _emailAlert = true;
   bool _smsAlert = false;
@@ -258,7 +262,6 @@ class _SettingsBodyState extends State<_SettingsBody> {
   @override
   void initState() {
     super.initState();
-    _loadSettings();
   }
 
   @override
@@ -305,8 +308,10 @@ class _SettingsBodyState extends State<_SettingsBody> {
           _emailAlert = data['emailAlert'] ?? true;
           _smsAlert = data['smsAlert'] ?? false;
           _darkMode = data['darkMode'] ?? false;
-          _language = data['language'] ?? _language;
-          _region = data['region'] ?? _region;
+
+          // ✅ FIX HERE
+          _selectedLanguage = data['language'] ?? 'English (Malaysia)';
+          _selectedRegion = data['region'] ?? 'Kuala Lumpur';
         });
 
         theme.setDarkMode(data['darkMode'] ?? false);
@@ -330,16 +335,16 @@ class _SettingsBodyState extends State<_SettingsBody> {
       return;
     }
 
-    if (finalUid == null) return;
-
     await FirebaseFirestore.instance.collection('users').doc(finalUid).set({
       'biometric': _biometricLogin,
       'emailAlert': _emailAlert,
       'smsAlert': _smsAlert,
       'darkMode': _darkMode,
-      'language': _language,
-      'region': _region,
-    }, SetOptions(merge: true)); // keep merge
+
+      // ✅ FIX HERE
+      'language': _selectedLanguage ?? 'English (Malaysia)',
+      'region': _selectedRegion ?? 'Kuala Lumpur',
+    }, SetOptions(merge: true));
 
     ScaffoldMessenger.of(
       context,
@@ -391,156 +396,177 @@ class _SettingsBodyState extends State<_SettingsBody> {
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(20, 14, 18, 14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Settings',
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurface,
-              fontSize: 28,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-
-          const SizedBox(height: 14),
-
-          // ================= ACCOUNT =================
-          const _SettingsSectionTitle('Account'),
-          const SizedBox(height: 10),
-
-          _SettingsCard(
-            children: [
-              // LANGUAGE
-              Padding(
-                padding: const EdgeInsets.all(12),
-                child: DropdownButtonFormField(
-                  value: _language,
-                  items: _languages
-                      .map((e) => DropdownMenuItem(value: e, child: Text(e)))
-                      .toList(),
-                  onChanged: (value) {
-                    setState(() => _language = value!);
-                  },
-                  decoration: const InputDecoration(
-                    labelText: "Preferred Language",
-                    border: OutlineInputBorder(),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 14, 18, 14),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight - 28),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Settings',
+                  style: TextStyle(
+                    color: Color(0xFF1E2D3F),
+                    fontSize: 28,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
-              ),
-
-              // REGION
-              Padding(
-                padding: const EdgeInsets.all(12),
-                child: DropdownButtonFormField(
-                  value: _region,
-                  items: _regions
-                      .map((e) => DropdownMenuItem(value: e, child: Text(e)))
-                      .toList(),
-                  onChanged: (value) {
-                    setState(() => _region = value!);
-                  },
-                  decoration: const InputDecoration(
-                    labelText: "Region",
-                    border: OutlineInputBorder(),
+                const SizedBox(height: 6),
+                const Text(
+                  'Manage your account, security, and notification preferences',
+                  style: TextStyle(
+                    color: Color(0xFF6B7B8D),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 14),
-
-          // ================= SECURITY =================
-          const _SettingsSectionTitle('Security'),
-          const SizedBox(height: 10),
-
-          _SettingsCard(
-            children: [
-              _ToggleRow(
-                title: 'Biometric Login',
-                subtitle: 'Use fingerprint or face ID',
-                value: _biometricLogin,
-                onChanged: (v) => setState(() => _biometricLogin = v),
-              ),
-              const Divider(),
-
-              ListTile(
-                title: const Text("Change Password"),
-                subtitle: const Text("Update your account password"),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: _changePasswordDialog,
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 14),
-
-          // ================= NOTIFICATIONS =================
-          const _SettingsSectionTitle('Notifications'),
-          const SizedBox(height: 10),
-
-          _SettingsCard(
-            children: [
-              _ToggleRow(
-                title: 'Email Alerts',
-                subtitle: 'Get updates by email',
-                value: _emailAlert,
-                onChanged: (v) => setState(() => _emailAlert = v),
-              ),
-              const Divider(),
-
-              _ToggleRow(
-                title: 'SMS Alerts',
-                subtitle: 'Receive SMS reminders',
-                value: _smsAlert,
-                onChanged: (v) => setState(() => _smsAlert = v),
-              ),
-              const Divider(),
-
-              _ToggleRow(
-                title: 'Dark Mode',
-                subtitle: 'Enable dark theme',
-                value: _darkMode,
-                onChanged: (v) {
-                  setState(() => setState(() => _darkMode = v));
-                  Provider.of<ThemeController>(
-                    context,
-                    listen: false,
-                  ).setDarkMode(v);
-                },
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 16),
-
-          // ================= SAVE =================
-          SizedBox(
-            width: 180,
-            height: 44,
-            child: FilledButton(
-              onPressed: _saveSettings,
-              style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFF1F4468),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                const SizedBox(height: 14),
+                const _SettingsSectionTitle('Account'),
+                const SizedBox(height: 10),
+                _SettingsCard(
+                  children: [
+                    _SelectRow(
+                      label: 'Preferred Language',
+                      value: _selectedLanguage,
+                      fallbackValue: 'English (Malaysia)',
+                      options: const [
+                        'English (Malaysia)',
+                        'Bahasa Melayu',
+                        'English (US)',
+                        'Chinese',
+                        'Tamil',
+                      ],
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedLanguage = value;
+                        });
+                      },
+                    ),
+                    const Divider(height: 1, color: Color(0xFFDDE3EA)),
+                    _SelectRow(
+                      label: 'Region',
+                      value: _selectedRegion,
+                      fallbackValue: 'Kuala Lumpur',
+                      options: const [
+                        'Kuala Lumpur',
+                        'Selangor',
+                        'Johor',
+                        'Penang',
+                        'Sabah',
+                        'Sarawak',
+                      ],
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedRegion = value;
+                        });
+                      },
+                    ),
+                    const Divider(height: 1, color: Color(0xFFDDE3EA)),
+                    _SelectRow(
+                      label: 'Account Type',
+                      value: _selectedAccountType,
+                      fallbackValue: 'Citizen',
+                      options: const [
+                        'Citizen',
+                        'Permanent Resident',
+                        'Foreigner',
+                        'Business',
+                      ],
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedAccountType = value;
+                        });
+                      },
+                    ),
+                  ],
                 ),
-              ),
-              child: const Text(
-                'Save Changes',
-                style: TextStyle(fontWeight: FontWeight.w700),
-              ),
+                const SizedBox(height: 14),
+                const _SettingsSectionTitle('Security'),
+                const SizedBox(height: 10),
+                _SettingsCard(
+                  children: [
+                    _ToggleRow(
+                      title: 'Biometric Login',
+                      subtitle: 'Use fingerprint or face ID for sign in',
+                      value: _biometricLogin,
+                      onChanged: (value) {
+                        setState(() {
+                          _biometricLogin = value;
+                        });
+                      },
+                    ),
+                    const Divider(height: 1, color: Color(0xFFDDE3EA)),
+                    _ActionRow(
+                      title: 'Change Password',
+                      subtitle: 'Update your account password',
+                      onTap: _changePasswordDialog, // ✅ THIS triggers dialog
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                const _SettingsSectionTitle('Notifications'),
+                const SizedBox(height: 10),
+                _SettingsCard(
+                  children: [
+                    _ToggleRow(
+                      title: 'Email Alerts',
+                      subtitle: 'Get important updates by email',
+                      value: _emailAlert,
+                      onChanged: (value) {
+                        setState(() {
+                          _emailAlert = value;
+                        });
+                      },
+                    ),
+                    const Divider(height: 1, color: Color(0xFFDDE3EA)),
+                    _ToggleRow(
+                      title: 'SMS Alerts',
+                      subtitle: 'Receive reminders via SMS',
+                      value: _smsAlert,
+                      onChanged: (value) {
+                        setState(() {
+                          _smsAlert = value;
+                        });
+                      },
+                    ),
+                    const Divider(height: 1, color: Color(0xFFDDE3EA)),
+                    _ToggleRow(
+                      title: 'Dark Mode',
+                      subtitle: 'Enable darker interface theme',
+                      value: _darkMode,
+                      onChanged: (value) {
+                        context.read<ThemeController>().setDarkMode(value);
+                      },
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: 180,
+                  height: 44,
+                  child: FilledButton(
+                    onPressed: () async {
+                      await _saveSettings();
+                    },
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFF1F4468),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text(
+                      'Save Changes',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
@@ -580,16 +606,29 @@ class _SettingsCard extends StatelessWidget {
   }
 }
 
-class _InfoRow extends StatelessWidget {
-  const _InfoRow({required this.label, required this.value});
+class _SelectRow extends StatelessWidget {
+  const _SelectRow({
+    required this.label,
+    required this.value,
+    required this.fallbackValue,
+    required this.options,
+    required this.onChanged,
+  });
 
   final String label;
-  final String value;
+  final String? value;
+  final String fallbackValue;
+  final List<String> options;
+  final ValueChanged<String> onChanged;
 
   @override
   Widget build(BuildContext context) {
+    final selectedValue = (value != null && options.contains(value))
+        ? value!
+        : fallbackValue;
+
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       child: Row(
         children: [
           Expanded(
@@ -602,12 +641,33 @@ class _InfoRow extends StatelessWidget {
               ),
             ),
           ),
-          Text(
-            value,
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurface,
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
+          SizedBox(
+            width: 220,
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String>(
+                value: selectedValue,
+                isExpanded: true,
+                alignment: Alignment.centerRight,
+                style: const TextStyle(
+                  color: Color(0xFF1E2D3F),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                ),
+                items: options
+                    .map(
+                      (option) => DropdownMenuItem<String>(
+                        value: option,
+                        child: Text(option),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (value) {
+                  if (value == null) {
+                    return;
+                  }
+                  onChanged(value);
+                },
+              ),
             ),
           ),
         ],
@@ -671,43 +731,48 @@ class _ToggleRow extends StatelessWidget {
 }
 
 class _ActionRow extends StatelessWidget {
-  const _ActionRow({required this.title, required this.subtitle});
+  const _ActionRow({required this.title, required this.subtitle, this.onTap});
 
   final String title;
   final String subtitle;
+  final VoidCallback? onTap; // ✅ added
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Change Password',
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurface,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
+    return InkWell(
+      // ✅ makes it clickable
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title, // ✅ use parameter (no hardcode)
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
-                ),
-                SizedBox(height: 2),
-                Text(
-                  'Update your account password',
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle, // ✅ use parameter
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          Icon(Icons.chevron_right, color: Color(0xFF7D8D9D)),
-        ],
+            const Icon(Icons.chevron_right, color: Color(0xFF7D8D9D)),
+          ],
+        ),
       ),
     );
   }

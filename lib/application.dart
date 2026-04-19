@@ -477,11 +477,11 @@ class _SuggestionGrid extends StatelessWidget {
           title: 'You are eligible for STR',
           subtitle:
               'Based on your income data, you qualify for Sumbangan Tunai Rahmah.',
+          imageAsset: 'assets/images/STR.webp',
         ),
         _SuggestionTile(
           title: 'Apply for MyKasih',
-          subtitle:
-              'Your household profile matches the MyKasih food aid criteria.',
+          subtitle: 'Your household profile matches the MyKasih food aid criteria.',
         ),
       ],
     );
@@ -489,10 +489,15 @@ class _SuggestionGrid extends StatelessWidget {
 }
 
 class _SuggestionTile extends StatelessWidget {
-  const _SuggestionTile({required this.title, required this.subtitle});
+  const _SuggestionTile({
+    required this.title,
+    required this.subtitle,
+    this.imageAsset,
+  });
 
   final String title;
   final String subtitle;
+  final String? imageAsset;
 
   @override
   Widget build(BuildContext context) {
@@ -505,8 +510,20 @@ class _SuggestionTile extends StatelessWidget {
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.center,
         children: [
+          if (imageAsset != null)
+            ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: SizedBox(
+                height: 170,
+                width: double.infinity,
+                child: Image.asset(
+                  imageAsset!,
+                  fit: BoxFit.cover,
+                ),
+              ),
+            ),
+          if (imageAsset != null) const SizedBox(height: 12),
           Text(
             title,
             style: TextStyle(

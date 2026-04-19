@@ -18,7 +18,10 @@ class ProfilePage extends StatelessWidget {
             borderRadius: BorderRadius.circular(12),
             child: Row(
               children: [
-                const SizedBox(width: 220, child: _ProfileSidebar()),
+                SizedBox(
+                  width: 220,
+                  child: _ProfileSidebar(),
+                ),
                 Expanded(
                   child: ColoredBox(
                     color: theme.scaffoldBackgroundColor,
@@ -192,31 +195,29 @@ class _ProfileBody extends StatefulWidget {
 
 class _ProfileBodyState extends State<_ProfileBody> {
   final repo = ProfileRepository();
-  Map<String, dynamic>? profile;
-  List<Map<String, dynamic>> docs = [];
+  String? _activeUid;
 
-  String? _activeUid; // Use this instead of FirebaseAuth.instance
-
+  // Controllers for data binding
   final nameController = TextEditingController();
   final icController = TextEditingController();
   final phoneController = TextEditingController();
   final emailController = TextEditingController();
   final addressController = TextEditingController();
 
+  // State variables
   bool isLoading = true;
   bool lhdn = true;
   bool kwsp = true;
   bool padu = false;
+  List<Map<String, dynamic>> _documents = [];
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-
-    // Get UID from Login/Dashboard arguments
+    
+    // Fallback logic for UID
     final String? args = ModalRoute.of(context)?.settings.arguments as String?;
-    // Fallback order: Arguments -> Auth -> Kelvin Demo ID
-    _activeUid =
-        args ??
+    _activeUid = args ??
         FirebaseAuth.instance.currentUser?.uid ??
         "QkP13R7eWNUB2yeLlJUBFqVXBHv2";
 
@@ -228,101 +229,181 @@ class _ProfileBodyState extends State<_ProfileBody> {
   Future<void> _loadProfile() async {
     if (_activeUid == null) return;
 
-    // Assuming your ProfileRepository methods take a UID
-    profile = await repo.getUserProfile(_activeUid!);
-    docs = await repo.getUserDocuments(_activeUid!);
+    try {
+      final profile = await repo.getUserProfile(_activeUid!);
+      final userDocs = await repo.getUserDocuments(_activeUid!);
 
-    if (profile != null) {
-      nameController.text = profile?['name'] ?? '';
-      icController.text = profile?['ic'] ?? '';
-      phoneController.text = profile?['phone'] ?? '';
-      emailController.text = profile?['email'] ?? '';
-      addressController.text = profile?['address'] ?? '';
+      if (profile != null) {
+        nameController.text = profile['name'] ?? '';
+        icController.text = profile['ic'] ?? '';
+        phoneController.text = profile['phone'] ?? '';
+        emailController.text = profile['email'] ?? '';
+        addressController.text = profile['address'] ?? '';
 
-      lhdn = profile?['share_lhdn'] ?? true;
-      kwsp = profile?['share_kwsp'] ?? true;
-      padu = profile?['share_padu'] ?? false;
+        lhdn = profile['share_lhdn'] ?? true;
+        kwsp = profile['share_kwsp'] ?? true;
+        padu = profile['share_padu'] ?? false;
+      }
+      
+      _documents = userDocs ?? [];
+    } catch (e) {
+      debugPrint("Error loading profile: $e");
+    } finally {
+      if (mounted) setState(() => isLoading = false);
     }
-
-    if (mounted) setState(() => isLoading = false);
   }
 
   Future<void> _saveProfile() async {
     if (_activeUid == null) return;
 
     await repo.updateProfile(_activeUid!, {
-      'name': nameController.text,
-      'ic': icController.text,
-      'phone': phoneController.text,
-      'email': emailController.text,
-      'address': addressController.text,
+      'name': nameController.text.trim(),
+      'ic': icController.text.trim(),
+      'phone': phoneController.text.trim(),
+      'email': emailController.text.trim(),
+      'address': addressController.text.trim(),
       'share_lhdn': lhdn,
       'share_kwsp': kwsp,
       'share_padu': padu,
     });
 
     if (mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Profile updated')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Profile updated successfully.')),
+      );
     }
   }
 
-  void _openEditDialog() {
+  Future<void> _showEditProfileDialog() async {
+    // Create temporary controllers to hold changes before saving
     final tempName = TextEditingController(text: nameController.text);
     final tempIc = TextEditingController(text: icController.text);
+    final tempAddress = TextEditingController(text: addressController.text);
     final tempPhone = TextEditingController(text: phoneController.text);
     final tempEmail = TextEditingController(text: emailController.text);
-    final tempAddress = TextEditingController(text: addressController.text);
 
-    showDialog(
+    await showDialog<void>(
       context: context,
-      builder: (_) => AlertDialog(
-        title: const Text("Edit Profile"),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _input(tempName, "Full Name"),
-              _input(tempIc, "IC Number"),
-              _input(tempPhone, "Phone"),
-              _input(tempEmail, "Email"),
-              _input(tempAddress, "Address"),
-            ],
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Edit Personal Profile'),
+          content: SizedBox(
+            width: 460,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildDialogField('Full Name', tempName),
+                  const SizedBox(height: 10),
+                  _buildDialogField('MyKad Number', tempIc),
+                  const SizedBox(height: 10),
+                  _buildDialogField('Address', tempAddress, maxLines: 2),
+                  const SizedBox(height: 10),
+                  _buildDialogField('Phone Number', tempPhone),
+                  const SizedBox(height: 10),
+                  _buildDialogField(
+                    'Email Address',
+                    tempEmail,
+                    keyboardType: TextInputType.emailAddress,
+                  ),
+                ],
+              ),
+            ),
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Cancel"),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              nameController.text = tempName.text;
-              icController.text = tempIc.text;
-              phoneController.text = tempPhone.text;
-              emailController.text = tempEmail.text;
-              addressController.text = tempAddress.text;
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () async {
+                // Apply changes to main controllers
+                setState(() {
+                  nameController.text = tempName.text;
+                  icController.text = tempIc.text;
+                  addressController.text = tempAddress.text;
+                  phoneController.text = tempPhone.text;
+                  emailController.text = tempEmail.text;
+                });
 
-              await _saveProfile();
-              if (mounted) {
-                Navigator.pop(context);
-                setState(() {});
-              }
-            },
-            child: const Text("Save"),
-          ),
-        ],
-      ),
+                await _saveProfile();
+                if (mounted) Navigator.of(dialogContext).pop();
+              },
+              child: const Text('Save Changes'),
+            ),
+          ],
+        );
+      },
+    );
+
+    tempName.dispose();
+    tempIc.dispose();
+    tempAddress.dispose();
+    tempPhone.dispose();
+    tempEmail.dispose();
+  }
+
+  Future<void> _showUploadDocumentDialog() async {
+    String? selectedCategory;
+    final categories = ['ID', 'Finance', 'Education', 'Health', 'Other'];
+
+    await showDialog<void>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Upload Document'),
+              content: SizedBox(
+                width: 420,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    DropdownButtonFormField<String>(
+                      value: selectedCategory,
+                      decoration: const InputDecoration(
+                        labelText: 'Choose Category',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: categories
+                          .map((cat) => DropdownMenuItem(value: cat, child: Text(cat)))
+                          .toList(),
+                      onChanged: (val) => setDialogState(() => selectedCategory = val),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton.icon(
+                  onPressed: () {
+                    if (selectedCategory == null) return;
+                    // Note: Here you would typically call repo.uploadDocument
+                    Navigator.of(context).pop();
+                  },
+                  icon: const Icon(Icons.upload_file_outlined),
+                  label: const Text('Upload Document'),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 
-  Widget _input(TextEditingController c, String label) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: TextField(
-        controller: c,
-        decoration: InputDecoration(labelText: label),
+  Widget _buildDialogField(String label, TextEditingController controller,
+      {int maxLines = 1, TextInputType keyboardType = TextInputType.text}) {
+    return TextField(
+      controller: controller,
+      maxLines: maxLines,
+      keyboardType: keyboardType,
+      decoration: InputDecoration(
+        labelText: label,
+        border: const OutlineInputBorder(),
       ),
     );
   }
@@ -365,9 +446,7 @@ class _ProfileBodyState extends State<_ProfileBody> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          nameController.text.isEmpty
-                              ? 'No Name'
-                              : nameController.text,
+                          nameController.text.isEmpty ? 'No Name' : nameController.text,
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.w700,
@@ -389,7 +468,7 @@ class _ProfileBodyState extends State<_ProfileBody> {
                 Align(
                   alignment: Alignment.centerRight,
                   child: TextButton(
-                    onPressed: _openEditDialog,
+                    onPressed: _showEditProfileDialog,
                     child: const Text("Edit"),
                   ),
                 ),
@@ -420,8 +499,19 @@ class _ProfileBodyState extends State<_ProfileBody> {
           ),
           const SizedBox(height: 14),
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Expanded(child: _DocumentVaultCard()),
+              Expanded(
+                child: _DocumentVaultCard(
+                  // Map Firebase list to the format expected by the UI card
+                  documents: _documents.map((d) => _StoredDocument(
+                    title: d['title'] ?? 'Untitled',
+                    category: d['category'] ?? 'Other',
+                    uploadedDate: d['date'] ?? '',
+                  )).toList(),
+                  onUploadPressed: _showUploadDocumentDialog,
+                ),
+              ),
               const SizedBox(width: 12),
               const Expanded(child: _LinkedServicesCard()),
             ],
@@ -442,7 +532,7 @@ class _ProfileBodyState extends State<_ProfileBody> {
                       kwsp = b;
                       padu = c;
                     });
-                    _saveProfile();
+                    _saveProfile(); // Sync to Firebase on toggle
                   },
                 ),
               ),
@@ -517,11 +607,13 @@ class _SectionCard extends StatelessWidget {
     required this.title,
     required this.icon,
     required this.child,
+    this.action,
   });
 
   final String title;
   final IconData icon;
   final Widget child;
+  final Widget? action;
 
   @override
   Widget build(BuildContext context) {
@@ -547,6 +639,8 @@ class _SectionCard extends StatelessWidget {
                   fontWeight: FontWeight.w700,
                 ),
               ),
+              const Spacer(),
+              if (action != null) action!,
             ],
           ),
           const SizedBox(height: 10),
@@ -558,33 +652,67 @@ class _SectionCard extends StatelessWidget {
 }
 
 class _DocumentVaultCard extends StatelessWidget {
-  const _DocumentVaultCard();
+  const _DocumentVaultCard({
+    required this.documents,
+    required this.onUploadPressed,
+  });
+
+  final List<_StoredDocument> documents;
+  final VoidCallback onUploadPressed;
 
   @override
   Widget build(BuildContext context) {
-    return const _SectionCard(
+    return _SectionCard(
       title: 'Document Vault',
       icon: Icons.description_outlined,
+      action: FilledButton.tonalIcon(
+        onPressed: onUploadPressed,
+        icon: const Icon(Icons.upload_file_outlined, size: 16),
+        label: const Text('Upload'),
+      ),
       child: Column(
-        children: [
-          _SimpleListTile(
-            title: 'Identity Card (MyKad)',
-            subtitle: 'ID - Uploaded 01 Jan 2025',
-          ),
-          SizedBox(height: 8),
-          _SimpleListTile(
-            title: 'Income Statement 2024',
-            subtitle: 'Finance - Uploaded 15 Mar 2025',
-          ),
-          SizedBox(height: 8),
-          _SimpleListTile(
-            title: 'SPM Certificate',
-            subtitle: 'Education - Uploaded 20 Jun 2023',
-          ),
-        ],
+        children: documents
+            .map(
+              (document) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: _SimpleListTile(
+                  title: document.title,
+                  subtitle: '${document.category} - Uploaded ${document.uploadedDate}',
+                ),
+              ),
+            )
+            .toList(),
       ),
     );
   }
+}
+
+class _UserProfile {
+  const _UserProfile({
+    required this.fullName,
+    required this.myKad,
+    required this.address,
+    required this.phone,
+    required this.email,
+  });
+
+  final String fullName;
+  final String myKad;
+  final String address;
+  final String phone;
+  final String email;
+}
+
+class _StoredDocument {
+  const _StoredDocument({
+    required this.title,
+    required this.category,
+    required this.uploadedDate,
+  });
+
+  final String title;
+  final String category;
+  final String uploadedDate;
 }
 
 class _SimpleListTile extends StatelessWidget {
