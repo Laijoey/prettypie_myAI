@@ -600,7 +600,8 @@ class ServiceActionPageState extends State<ServiceActionPage> {
           _epfIdController.text = ic;
           _epfPhoneController.text = phone;
           _epfEmployerController.text =
-              ocrResult?.phone ?? profile['employer_name'] ?? '';
+              ocrResult?.employerName ??
+              (profile['employer_name'] ?? '').toString();
         } else if (_isHealthService) {
           _healthNameController.text = name;
           _healthIdController.text = ic;
@@ -680,6 +681,8 @@ class ServiceActionPageState extends State<ServiceActionPage> {
           _epfIdController.text = extracted.icNumber ?? _epfIdController.text;
           _epfPhoneController.text =
               extracted.phone ?? _epfPhoneController.text;
+          _epfEmployerController.text =
+              extracted.employerName ?? _epfEmployerController.text;
         });
       } else if (_isHealthService) {
         setState(() {
@@ -1178,6 +1181,14 @@ class ServiceActionPageState extends State<ServiceActionPage> {
               border: OutlineInputBorder(),
             ),
           ),
+          const SizedBox(height: 10),
+          TextFormField(
+            controller: _epfEmployerController,
+            decoration: const InputDecoration(
+              labelText: 'Employer Name',
+              border: OutlineInputBorder(),
+            ),
+          ),
 
           const SizedBox(height: 14),
           _buildInfoSection('1. Member (User) Information', [
@@ -1430,6 +1441,43 @@ class ServiceActionPageState extends State<ServiceActionPage> {
             ),
           ),
           const SizedBox(height: 14),
+          const Text(
+            'Quick Auto-Fill Fields',
+            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+          ),
+          const SizedBox(height: 8),
+          TextFormField(
+            controller: _healthNameController,
+            decoration: const InputDecoration(
+              labelText: 'Full Name',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 10),
+          TextFormField(
+            controller: _healthIdController,
+            decoration: const InputDecoration(
+              labelText: 'IC Number / Passport',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 10),
+          TextFormField(
+            controller: _healthDobController,
+            decoration: const InputDecoration(
+              labelText: 'Date of Birth',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 10),
+          TextFormField(
+            controller: _healthPhoneController,
+            decoration: const InputDecoration(
+              labelText: 'Phone Number',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 14),
           _buildInfoSection('1. Personal Information (Basic Identity)', [
             _buildInfoField('Full Name'),
             _buildInfoField('IC Number / Passport'),
@@ -1615,6 +1663,35 @@ class ServiceActionPageState extends State<ServiceActionPage> {
             ),
           ),
           const SizedBox(height: 14),
+          const Text(
+            'Quick Auto-Fill Fields',
+            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+          ),
+          const SizedBox(height: 8),
+          TextFormField(
+            controller: _ptptnNameController,
+            decoration: const InputDecoration(
+              labelText: 'Full Name',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 10),
+          TextFormField(
+            controller: _ptptnIdController,
+            decoration: const InputDecoration(
+              labelText: 'IC Number (MyKad)',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 10),
+          TextFormField(
+            controller: _ptptnPhoneController,
+            decoration: const InputDecoration(
+              labelText: 'Phone Number',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 14),
           _buildInfoSection('1. Borrower Identification (VERY IMPORTANT)', [
             _buildInfoField('Full Name'),
             _buildInfoField('IC Number (MyKad)'),
@@ -1767,6 +1844,16 @@ class ServiceActionPageState extends State<ServiceActionPage> {
                     label: const Text('Use Existing JPJ Photo'),
                   ),
                 ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  height: 42,
+                  child: FilledButton.icon(
+                    onPressed: fillWithAI,
+                    icon: const Icon(Icons.auto_awesome),
+                    label: const Text('Auto Fill with AI'),
+                  ),
+                ),
                 const SizedBox(height: 10),
                 Container(
                   width: double.infinity,
@@ -1790,6 +1877,35 @@ class ServiceActionPageState extends State<ServiceActionPage> {
                 ),
                 _buildAiOcrSummaryCard(),
               ],
+            ),
+          ),
+          const SizedBox(height: 14),
+          const Text(
+            'Quick Auto-Fill Fields',
+            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+          ),
+          const SizedBox(height: 8),
+          TextFormField(
+            controller: _licenseNameController,
+            decoration: const InputDecoration(
+              labelText: 'Full Name',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 10),
+          TextFormField(
+            controller: _licenseIdController,
+            decoration: const InputDecoration(
+              labelText: 'IC Number (MyKad)',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 10),
+          TextFormField(
+            controller: _licenseDobController,
+            decoration: const InputDecoration(
+              labelText: 'Date of Birth',
+              border: OutlineInputBorder(),
             ),
           ),
           const SizedBox(height: 14),
@@ -1932,6 +2048,16 @@ class ServiceActionPageState extends State<ServiceActionPage> {
                     label: const Text('Upload Summons Document'),
                   ),
                 ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  height: 42,
+                  child: FilledButton.icon(
+                    onPressed: fillWithAI,
+                    icon: const Icon(Icons.auto_awesome),
+                    label: const Text('Auto Fill with AI'),
+                  ),
+                ),
                 const SizedBox(height: 10),
                 Container(
                   width: double.infinity,
@@ -1953,7 +2079,37 @@ class ServiceActionPageState extends State<ServiceActionPage> {
                     ),
                   ),
                 ),
+                _buildAiOcrSummaryCard(),
               ],
+            ),
+          ),
+          const SizedBox(height: 14),
+          const Text(
+            'Quick Auto-Fill Fields',
+            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+          ),
+          const SizedBox(height: 8),
+          TextFormField(
+            controller: _summonsNameController,
+            decoration: const InputDecoration(
+              labelText: 'Full Name',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 10),
+          TextFormField(
+            controller: _summonsIdController,
+            decoration: const InputDecoration(
+              labelText: 'IC Number (MyKad)',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 10),
+          TextFormField(
+            controller: _summonsPhoneController,
+            decoration: const InputDecoration(
+              labelText: 'Phone Number',
+              border: OutlineInputBorder(),
             ),
           ),
           const SizedBox(height: 14),

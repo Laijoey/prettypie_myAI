@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:typed_data';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
@@ -131,6 +130,16 @@ class AiService {
     defaultValue: '',
   );
 
+  void _addLoopbackCandidates(List<String> values, String scheme) {
+    values.add('$scheme://127.0.0.1:5001');
+    values.add('$scheme://localhost:5001');
+
+    if (scheme != 'http') {
+      values.add('http://127.0.0.1:5001');
+      values.add('http://localhost:5001');
+    }
+  }
+
   List<String> _baseUrlCandidates() {
     final values = <String>[];
     final configured = _configuredBaseUrl.trim();
@@ -140,13 +149,16 @@ class AiService {
 
     if (kIsWeb) {
       final host = Uri.base.host;
+      final scheme = Uri.base.scheme.isEmpty ? 'http' : Uri.base.scheme;
+
       if (host.isNotEmpty) {
-        final scheme = Uri.base.scheme.isEmpty ? 'http' : Uri.base.scheme;
         values.add('$scheme://$host:5001');
         if (scheme != 'http') {
           values.add('http://$host:5001');
         }
       }
+
+      _addLoopbackCandidates(values, scheme);
     } else {
       switch (defaultTargetPlatform) {
         case TargetPlatform.android:
@@ -155,7 +167,7 @@ class AiService {
         default:
           break;
       }
-      values.add('http://127.0.0.1:5001');
+      _addLoopbackCandidates(values, 'http');
     }
 
     final deduped = <String>[];
