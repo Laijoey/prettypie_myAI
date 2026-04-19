@@ -405,10 +405,10 @@ class _SettingsBodyState extends State<_SettingsBody> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Settings',
                   style: TextStyle(
-                    color: Color(0xFF1E2D3F),
+                    color: Theme.of(context).colorScheme.onSurface,
                     fontSize: 28,
                     fontWeight: FontWeight.w700,
                   ),
@@ -535,8 +535,11 @@ class _SettingsBodyState extends State<_SettingsBody> {
                     _ToggleRow(
                       title: 'Dark Mode',
                       subtitle: 'Enable darker interface theme',
-                      value: _darkMode,
+                      value: context.watch<ThemeController>().isDark, 
                       onChanged: (value) {
+                        setState(() {
+                          _darkMode = value;
+                        });
                         context.read<ThemeController>().setDarkMode(value);
                       },
                     ),
@@ -626,6 +629,7 @@ class _SelectRow extends StatelessWidget {
     final selectedValue = (value != null && options.contains(value))
         ? value!
         : fallbackValue;
+    final theme = Theme.of(context);
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
@@ -634,8 +638,8 @@ class _SelectRow extends StatelessWidget {
           Expanded(
             child: Text(
               label,
-              style: const TextStyle(
-                color: Color(0xFF5F738A),
+              style: TextStyle(
+                color: theme.colorScheme.onSurface,
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
               ),
@@ -762,7 +766,7 @@ class _ActionRow extends StatelessWidget {
                   Text(
                     subtitle, // ✅ use parameter
                     style: TextStyle(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      color: Color(0xFF6F8094),
                       fontSize: 10,
                       fontWeight: FontWeight.w600,
                     ),

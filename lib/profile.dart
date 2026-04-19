@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'chat_assistant_fab.dart'; // Ensure this import matches your project
+import 'package:http/http.dart' as http;
+import 'package:file_picker/file_picker.dart';
+import 'dart:convert';
 
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
@@ -18,10 +21,7 @@ class ProfilePage extends StatelessWidget {
             borderRadius: BorderRadius.circular(12),
             child: Row(
               children: [
-                SizedBox(
-                  width: 220,
-                  child: _ProfileSidebar(),
-                ),
+                SizedBox(width: 220, child: _ProfileSidebar()),
                 Expanded(
                   child: ColoredBox(
                     color: theme.scaffoldBackgroundColor,
@@ -211,13 +211,17 @@ class _ProfileBodyState extends State<_ProfileBody> {
   bool padu = false;
   List<Map<String, dynamic>> _documents = [];
 
+  final String baseUrl =
+      "https://prettypie-api-661875192859.asia-southeast1.run.app";
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    
+
     // Fallback logic for UID
     final String? args = ModalRoute.of(context)?.settings.arguments as String?;
-    _activeUid = args ??
+    _activeUid =
+        args ??
         FirebaseAuth.instance.currentUser?.uid ??
         "QkP13R7eWNUB2yeLlJUBFqVXBHv2";
 
@@ -244,7 +248,7 @@ class _ProfileBodyState extends State<_ProfileBody> {
         kwsp = profile['share_kwsp'] ?? true;
         padu = profile['share_padu'] ?? false;
       }
-      
+
       _documents = userDocs ?? [];
     } catch (e) {
       debugPrint("Error loading profile: $e");
@@ -366,9 +370,13 @@ class _ProfileBodyState extends State<_ProfileBody> {
                         border: OutlineInputBorder(),
                       ),
                       items: categories
-                          .map((cat) => DropdownMenuItem(value: cat, child: Text(cat)))
+                          .map(
+                            (cat) =>
+                                DropdownMenuItem(value: cat, child: Text(cat)),
+                          )
                           .toList(),
-                      onChanged: (val) => setDialogState(() => selectedCategory = val),
+                      onChanged: (val) =>
+                          setDialogState(() => selectedCategory = val),
                     ),
                   ],
                 ),
@@ -379,10 +387,11 @@ class _ProfileBodyState extends State<_ProfileBody> {
                   child: const Text('Cancel'),
                 ),
                 FilledButton.icon(
-                  onPressed: () {
+                  onPressed: () async {
                     if (selectedCategory == null) return;
-                    // Note: Here you would typically call repo.uploadDocument
+
                     Navigator.of(context).pop();
+                    await uploadDocument(selectedCategory!);
                   },
                   icon: const Icon(Icons.upload_file_outlined),
                   label: const Text('Upload Document'),
@@ -395,8 +404,67 @@ class _ProfileBodyState extends State<_ProfileBody> {
     );
   }
 
-  Widget _buildDialogField(String label, TextEditingController controller,
-      {int maxLines = 1, TextInputType keyboardType = TextInputType.text}) {
+  Future<void> uploadDocument(String type) async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf', 'jpg', 'png'],
+        withData: true,
+      );
+
+      if (result == null || result.files.first.bytes == null) return;
+
+      final file = result.files.first;
+
+      setState(() => isLoading = true);
+
+      final user = FirebaseAuth.instance.currentUser;
+      final token = await user!.getIdToken();
+
+      final request = http.MultipartRequest(
+        "POST",
+        Uri.parse("$baseUrl/upload-doc"), // ✅ updated endpoint
+      );
+
+      request.headers["Authorization"] = "Bearer $token";
+
+      // ✅ ADD TYPE (epf, health, loan, lesen, summons)
+      request.fields["type"] = type;
+
+      request.files.add(
+        http.MultipartFile.fromBytes("file", file.bytes!, filename: file.name),
+      );
+
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+
+      print("UPLOAD STATUS: ${response.statusCode}");
+      print("UPLOAD RESPONSE: $responseBody");
+
+      final data = jsonDecode(responseBody);
+
+      if (response.statusCode != 200 || data["success"] != true) {
+        throw Exception(data["error"] ?? "Upload failed");
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Document uploaded successfully ✅")),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Upload failed: $e")));
+    } finally {
+      setState(() => isLoading = false);
+    }
+  }
+
+  Widget _buildDialogField(
+    String label,
+    TextEditingController controller, {
+    int maxLines = 1,
+    TextInputType keyboardType = TextInputType.text,
+  }) {
     return TextField(
       controller: controller,
       maxLines: maxLines,
@@ -446,7 +514,9 @@ class _ProfileBodyState extends State<_ProfileBody> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          nameController.text.isEmpty ? 'No Name' : nameController.text,
+                          nameController.text.isEmpty
+                              ? 'No Name'
+                              : nameController.text,
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.w700,
@@ -504,11 +574,15 @@ class _ProfileBodyState extends State<_ProfileBody> {
               Expanded(
                 child: _DocumentVaultCard(
                   // Map Firebase list to the format expected by the UI card
-                  documents: _documents.map((d) => _StoredDocument(
-                    title: d['title'] ?? 'Untitled',
-                    category: d['category'] ?? 'Other',
-                    uploadedDate: d['date'] ?? '',
-                  )).toList(),
+                  documents: _documents
+                      .map(
+                        (d) => _StoredDocument(
+                          title: d['title'] ?? 'Untitled',
+                          category: d['category'] ?? 'Other',
+                          uploadedDate: d['date'] ?? '',
+                        ),
+                      )
+                      .toList(),
                   onUploadPressed: _showUploadDocumentDialog,
                 ),
               ),
@@ -677,7 +751,8 @@ class _DocumentVaultCard extends StatelessWidget {
                 padding: const EdgeInsets.only(bottom: 8),
                 child: _SimpleListTile(
                   title: document.title,
-                  subtitle: '${document.category} - Uploaded ${document.uploadedDate}',
+                  subtitle:
+                      '${document.category} - Uploaded ${document.uploadedDate}',
                 ),
               ),
             )

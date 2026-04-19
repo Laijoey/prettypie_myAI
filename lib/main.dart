@@ -337,8 +337,8 @@ class _LoginPanelState extends State<_LoginPanel> {
     );
   }
 
-  void _openDashboard() {
-    Navigator.of(context).pushReplacementNamed('/dashboard');
+  void _openDashboard(String userId) {
+    Navigator.of(context).pushReplacementNamed('/dashboard', arguments: userId);
   }
 
   Future<void> loginWithQr(String userId) async {
@@ -354,7 +354,7 @@ class _LoginPanelState extends State<_LoginPanel> {
         ).showSnackBar(const SnackBar(content: Text('Invalid QR User')));
         return;
       }
-      _openDashboard();
+      _openDashboard(userId);
     } catch (e) {
       ScaffoldMessenger.of(
         context,
@@ -389,7 +389,7 @@ class _LoginPanelState extends State<_LoginPanel> {
 
       if (mounted) {
         Navigator.pop(context); // Close Popup
-        _openDashboard(); // Go straight to Kelvin's profile
+        _openDashboard(kelvinUid); // Go straight to Kelvin's profile
       }
     });
   }
@@ -567,7 +567,7 @@ class _LoginPanelState extends State<_LoginPanel> {
                             ).loadThemeFromFirestore();
                             final uid =
                                 FirebaseAuth.instance.currentUser?.uid ?? phone;
-                            _openDashboard();
+                            _openDashboard(uid);
                           } else {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(content: Text('Invalid OTP')),
@@ -720,7 +720,7 @@ class _LoginPanelState extends State<_LoginPanel> {
                     listen: false,
                   ).loadThemeFromFirestore();
                   final uid = FirebaseAuth.instance.currentUser?.uid ?? input;
-                  _openDashboard();
+                  _openDashboard(uid);
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('Invalid credentials')),
@@ -1079,19 +1079,18 @@ class _DashboardBodyState extends State<_DashboardBody> {
 
   Future<void> _loadUserData() async {
     try {
-      // 1. Get UID from navigation arguments or Firebase Auth
       final String? args =
           ModalRoute.of(context)?.settings.arguments as String?;
       final String? authUid = FirebaseAuth.instance.currentUser?.uid;
 
-      // Fallback to Kelvin's UID if testing the QR demo
       final String uid = args ?? authUid ?? "QkP13R7eWNUB2yeLlJUBFqVXBHv2";
 
-      // 2. Fetch the name from Firestore
       final doc = await FirebaseFirestore.instance
           .collection('users')
           .doc(uid)
           .get();
+
+      if (!mounted) return; // 👈 ADD THIS
 
       if (doc.exists && doc.data() != null) {
         setState(() {
@@ -1103,6 +1102,9 @@ class _DashboardBodyState extends State<_DashboardBody> {
       }
     } catch (e) {
       debugPrint("Error loading user name: $e");
+
+      if (!mounted) return; // 👈 ADD THIS
+
       setState(() => _isLoading = false);
     }
   }
