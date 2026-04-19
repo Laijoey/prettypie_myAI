@@ -4,37 +4,32 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:file_picker/file_picker.dart';
+
+import 'services/ai_service.dart';
+import 'services/prefill_service.dart';
+import 'services/service_navigation_intent.dart';
 
 class ServicePage extends StatelessWidget {
   const ServicePage({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
-      floatingActionButton: const ChatAssistantFab(),
-
+      backgroundColor: const Color(0xFFEDEFF2),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(6),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(12),
             child: Row(
-              children: [
-                // ================= SIDEBAR =================
-                const SizedBox(width: 220, child: _ServicesSidebar()),
-
-                // ================= MAIN CONTENT =================
+              children: const [
+                SizedBox(width: 220, child: _ServicesSidebar()),
                 Expanded(
                   child: ColoredBox(
-                    color: isDark
-                        ? theme.scaffoldBackgroundColor
-                        : const Color(0xFFF5F5F7),
-                    child: const _ServicesBody(),
+                    color: Color(0xFFF5F5F7),
+                    child: _ServicesBody(),
                   ),
                 ),
               ],
@@ -42,6 +37,7 @@ class ServicePage extends StatelessWidget {
           ),
         ),
       ),
+      floatingActionButton: const ChatAssistantFab(),
     );
   }
 }
@@ -88,7 +84,7 @@ class _ServicesSidebar extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 10),
-                Column(
+                const Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
@@ -176,31 +172,21 @@ class _ServicesSidebar extends StatelessWidget {
               },
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(18, 4, 18, 16),
-            child: InkWell(
-              onTap: () async {
-                await FirebaseAuth.instance.signOut();
-
-                // IMPORTANT: clear navigation stack
-                Navigator.of(
-                  context,
-                ).pushNamedAndRemoveUntil('/login', (route) => false);
-              },
-              child: const Row(
-                children: [
-                  Icon(Icons.logout, color: Color(0xFFC2D1DF)),
-                  SizedBox(width: 10),
-                  Text(
-                    'Logout',
-                    style: TextStyle(
-                      color: Color(0xFFC2D1DF),
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                    ),
+          const Padding(
+            padding: EdgeInsets.fromLTRB(18, 4, 18, 16),
+            child: Row(
+              children: [
+                Icon(Icons.logout, color: Color(0xFFC2D1DF)),
+                SizedBox(width: 10),
+                Text(
+                  'Logout',
+                  style: TextStyle(
+                    color: Color(0xFFC2D1DF),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ],
@@ -218,137 +204,72 @@ class _ServicesBody extends StatefulWidget {
 
 class _ServicesBodyState extends State<_ServicesBody> {
   String query = '';
-  bool _showAllServices = false;
-  final List<ServiceItem> _allItems = [
-    ..._popularItems,
-    ..._governmentServices,
-  ];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _openTargetServiceIfRequested();
+    });
+  }
+
+  void _openTargetServiceIfRequested() {
+    final targetTitle = ServiceNavigationIntent.targetServiceTitle;
+    if (targetTitle == null || targetTitle.isEmpty) {
+      return;
+    }
+
+    final allItems = [..._popularItems, ..._allItems];
+    final target = allItems.where((item) => item.title == targetTitle).toList();
+    ServiceNavigationIntent.targetServiceTitle = null;
+
+    if (target.isEmpty || !mounted) {
+      return;
+    }
+
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => ServiceActionPage(item: target.first)),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    final lowerQuery = query.toLowerCase();
-
-    List<ServiceItem> filter(List<ServiceItem> items) {
-      return items.where((item) {
-        final titleMatch = item.title.toLowerCase().contains(lowerQuery);
-        final subtitleMatch = item.subtitle.toLowerCase().contains(lowerQuery);
-
-        final subServiceMatch =
-            _subServiceMap[item.title]?.any(
-              (sub) => sub.toLowerCase().contains(lowerQuery),
-            ) ??
-            false;
-
-        return titleMatch || subtitleMatch || subServiceMatch;
-      }).toList();
-    }
-
-    final filteredPopular = filter(_popularItems);
-    final filteredAll = filter(_allItems);
-
     return LayoutBuilder(
       builder: (context, constraints) {
         return SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(20, 14, 18, 14),
           child: ConstrainedBox(
             constraints: BoxConstraints(minHeight: constraints.maxHeight - 28),
-            child: Column(
+            child: const Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // ================= TITLE =================
                 Text(
                   'Government Services',
                   style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurface,
+                    color: Color(0xFF1E2D3F),
                     fontSize: 28,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
-                const SizedBox(height: 6),
+                SizedBox(height: 6),
                 Text(
                   'Access all government services in one place',
                   style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    color: Color(0xFF6B7B8D),
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
-
-                const SizedBox(height: 16),
-
-                // ================= SEARCH =================
-                SearchServicesField(
-                  onSearch: (value) {
-                    setState(() {
-                      query = value;
-                    });
-                  },
-                ),
-
-                const SizedBox(height: 20),
-
-                // ================= MAIN LOGIC (NO UI CHANGE) =================
-                if (query.isNotEmpty) ...[
-                  _ServiceSectionTitle('Popular Services'),
-                  const SizedBox(height: 10),
-                  filteredPopular.isEmpty
-                      ? const Text("No results found")
-                      : _ServiceGrid(items: filteredPopular, showArrow: true),
-
-                  const SizedBox(height: 18),
-
-                  _ServiceSectionTitle('All Services'),
-                  const SizedBox(height: 10),
-                  filteredAll.isEmpty
-                      ? const Text("No results found")
-                      : _ServiceGrid(items: filteredAll, showArrow: false),
-                ] else ...[
-                  SearchServicesField(
-                    onSearch: (value) {
-                      setState(() {
-                        query = value;
-                      });
-                    },
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  const _ServiceSectionTitle('Popular Services'),
-                  const SizedBox(height: 10),
-                  _ServiceGrid(items: _popularItems, showArrow: true),
-
-                  const SizedBox(height: 18),
-
-                  Row(
-                    children: [
-                      const _ServiceSectionTitle('All Services'),
-                      const Spacer(),
-                      TextButton(
-                        onPressed: () {
-                          setState(() {
-                            _showAllServices = !_showAllServices;
-                          });
-                        },
-                        child: Text(
-                          _showAllServices ? 'Show Less' : 'View All',
-                          style: const TextStyle(
-                            color: Color(0xFF214B74),
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 10),
-
-                  _ServiceGrid(
-                    items: _showAllServices
-                        ? _allItems
-                        : _allItems.take(6).toList(),
-                    showArrow: false,
-                  ),
-                ],
+                SizedBox(height: 16),
+                _SearchServicesField(),
+                SizedBox(height: 20),
+                _ServiceSectionTitle('Popular Services'),
+                SizedBox(height: 10),
+                _ServiceGrid(popular: true),
+                SizedBox(height: 18),
+                _ServiceSectionTitle('All Services'),
+                SizedBox(height: 10),
+                _ServiceGrid(popular: false),
               ],
             ),
           ),
@@ -358,85 +279,27 @@ class _ServicesBodyState extends State<_ServicesBody> {
   }
 }
 
-class SearchServicesField extends StatefulWidget {
-  final Function(String) onSearch;
-
-  const SearchServicesField({super.key, required this.onSearch});
-
-  @override
-  State<SearchServicesField> createState() => _SearchServicesFieldState();
-}
-
-class _SearchServicesFieldState extends State<SearchServicesField> {
-  final TextEditingController _controller = TextEditingController();
-  Timer? _debounce;
-
-  void _onSearchChanged(String query) {
-    // ✅ debounce (avoid too many calls)
-    if (_debounce?.isActive ?? false) _debounce!.cancel();
-
-    _debounce = Timer(const Duration(milliseconds: 300), () {
-      widget.onSearch(query);
-    });
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    _debounce?.cancel();
-    super.dispose();
-  }
+class _SearchServicesField extends StatelessWidget {
+  const _SearchServicesField();
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return TextField(
-      controller: _controller,
-      onChanged: _onSearchChanged, // 🔥 search while typing
-      style: TextStyle(color: theme.colorScheme.onSurface),
       decoration: InputDecoration(
+        isDense: true,
         hintText:
             'Search services... (e.g. renew license, check tax, apply bantuan)',
-
-        hintStyle: TextStyle(
-          color: theme.colorScheme.onSurface.withOpacity(0.6),
-        ),
-
-        prefixIcon: Icon(
-          Icons.search,
-          color: theme.colorScheme.onSurfaceVariant,
-        ),
-
-        suffixIcon: _controller.text.isNotEmpty
-            ? IconButton(
-                icon: const Icon(Icons.clear),
-                onPressed: () {
-                  _controller.clear();
-                  widget.onSearch('');
-                  setState(() {}); // refresh clear button
-                },
-              )
-            : null,
-
+        prefixIcon: const Icon(Icons.search),
         filled: true,
-        fillColor: theme.colorScheme.surface,
-
-        contentPadding: const EdgeInsets.symmetric(vertical: 12),
-
+        fillColor: const Color(0xFFF2F4F7),
+        contentPadding: const EdgeInsets.symmetric(vertical: 8),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: theme.dividerColor),
+          borderSide: const BorderSide(color: Color(0xFFD9DEE5)),
         ),
-
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: theme.dividerColor),
-        ),
-
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: theme.colorScheme.primary),
+          borderSide: const BorderSide(color: Color(0xFFD9DEE5)),
         ),
       ),
     );
@@ -452,8 +315,8 @@ class _ServiceSectionTitle extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       label,
-      style: TextStyle(
-        color: Theme.of(context).colorScheme.onSurface,
+      style: const TextStyle(
+        color: Color(0xFF1E2D3F),
         fontSize: 20,
         fontWeight: FontWeight.w700,
       ),
@@ -462,13 +325,14 @@ class _ServiceSectionTitle extends StatelessWidget {
 }
 
 class _ServiceGrid extends StatelessWidget {
-  const _ServiceGrid({required this.items, required this.showArrow});
+  const _ServiceGrid({required this.popular});
 
-  final List<ServiceItem> items;
-  final bool showArrow;
+  final bool popular;
 
   @override
   Widget build(BuildContext context) {
+    final items = popular ? _popularItems : _allItems;
+
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
@@ -483,7 +347,7 @@ class _ServiceGrid extends StatelessWidget {
         final item = items[index];
         return _ServiceTile(
           item: item,
-          showArrow: showArrow,
+          showArrow: popular,
           onTap: () {
             Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => ServiceActionPage(item: item)),
@@ -500,7 +364,6 @@ class _ServiceTile extends StatelessWidget {
     required this.item,
     required this.showArrow,
     required this.onTap,
-    super.key,
   });
 
   final ServiceItem item;
@@ -509,14 +372,6 @@ class _ServiceTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    //     final Map<String, String> routeMap = {
-    //       'Tax Filing': '/tax',
-    //       'EPF Management': '/epf',
-    //       'Health Services': '/health',
-    //       'Loan Payment': '/ptptn',
-    //       'License Renewal': '/jpj',
-    //       'Summons Payment': '/pdrm',
-    // };
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -525,9 +380,9 @@ class _ServiceTile extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface,
+            color: const Color(0xFFF7F8FA),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Theme.of(context).dividerColor),
+            border: Border.all(color: const Color(0xFFD9DEE5)),
           ),
           child: Row(
             children: [
@@ -548,8 +403,8 @@ class _ServiceTile extends StatelessWidget {
                   children: [
                     Text(
                       item.title,
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.onSurface,
+                      style: const TextStyle(
+                        color: Color(0xFF1E2D3F),
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
                       ),
@@ -586,14 +441,44 @@ class ServiceActionPage extends StatefulWidget {
   final ServiceItem item;
 
   @override
-  State<ServiceActionPage> createState() => _ServiceActionPageState();
+  State<ServiceActionPage> createState() => ServiceActionPageState();
 }
 
-class _ServiceActionPageState extends State<ServiceActionPage> {
+class ServiceActionPageState extends State<ServiceActionPage> {
   final _formKey = GlobalKey<FormState>();
+  // Tax Filing Controllers
+  final _nameController = TextEditingController();
   final _tinController = TextEditingController();
   final _idController = TextEditingController();
+  final _addressController = TextEditingController();
+  final _dobController = TextEditingController();
   final _amountController = TextEditingController();
+
+  // Shared controllers for other services
+  final _epfNameController = TextEditingController();
+  final _epfIdController = TextEditingController();
+  final _epfEmployerController = TextEditingController();
+  final _epfPhoneController = TextEditingController();
+
+  final _healthNameController = TextEditingController();
+  final _healthIdController = TextEditingController();
+  final _healthPhoneController = TextEditingController();
+  final _healthDobController = TextEditingController();
+
+  final _ptptnNameController = TextEditingController();
+  final _ptptnIdController = TextEditingController();
+  final _ptptnPhoneController = TextEditingController();
+
+  final _licenseNameController = TextEditingController();
+  final _licenseIdController = TextEditingController();
+  final _licenseDobController = TextEditingController();
+
+  final _summonsNameController = TextEditingController();
+  final _summonsIdController = TextEditingController();
+  final _summonsPhoneController = TextEditingController();
+
+  AiOcrResult? _latestOcrResult;
+  String? _aiNote;
   String _taxType = 'Income Tax (Cukai Pendapatan)';
   String _assessmentYear = '${DateTime.now().year}';
   String _paymentCode = '084';
@@ -604,21 +489,45 @@ class _ServiceActionPageState extends State<ServiceActionPage> {
   bool get _isLoanPayment => widget.item.title == 'Loan Payment';
   bool get _isLicenseRenewal => widget.item.title == 'License Renewal';
   bool get _isSummonsPayment => widget.item.title == 'Summons Payment';
-
   bool isLoading = false;
-  Map<String, dynamic>? taxResult;
-  Map<String, dynamic>? income;
-  List<dynamic>? reliefs;
-  String? taxStatus;
-
-  final String baseUrl =
-      "https://prettypie-api-661875192859.asia-southeast1.run.app";
 
   @override
   void dispose() {
+    // Tax controllers
+    _nameController.dispose();
     _tinController.dispose();
     _idController.dispose();
+    _addressController.dispose();
+    _dobController.dispose();
     _amountController.dispose();
+
+    // EPF controllers
+    _epfNameController.dispose();
+    _epfIdController.dispose();
+    _epfEmployerController.dispose();
+    _epfPhoneController.dispose();
+
+    // Health controllers
+    _healthNameController.dispose();
+    _healthIdController.dispose();
+    _healthPhoneController.dispose();
+    _healthDobController.dispose();
+
+    // PTPTN controllers
+    _ptptnNameController.dispose();
+    _ptptnIdController.dispose();
+    _ptptnPhoneController.dispose();
+
+    // License controllers
+    _licenseNameController.dispose();
+    _licenseIdController.dispose();
+    _licenseDobController.dispose();
+
+    // Summons controllers
+    _summonsNameController.dispose();
+    _summonsIdController.dispose();
+    _summonsPhoneController.dispose();
+
     super.dispose();
   }
 
@@ -627,42 +536,108 @@ class _ServiceActionPageState extends State<ServiceActionPage> {
 
     try {
       final user = FirebaseAuth.instance.currentUser;
-      final token = await user!.getIdToken();
+      if (user == null) {
+        throw Exception('Please sign in first.');
+      }
 
-      final response = await http.post(
-        Uri.parse("$baseUrl/auto-fill-profile"),
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": "Bearer $token",
-        },
-        body: jsonEncode({"uid": user.uid}),
+      final profileDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+      final profile = profileDoc.data() ?? const {};
+
+      final documentSnapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('documents')
+          .get();
+
+      final documents = documentSnapshot.docs.map((doc) => doc.data()).toList();
+      final prefill = PrefillService.buildPrefill(
+        profile: profile,
+        documents: documents,
       );
+      final ocrResult = AiDraftStore.instance.lastOcrResult;
 
-      final data = jsonDecode(response.body);
-
-      final profile = data["data"];
+      _latestOcrResult = ocrResult;
 
       setState(() {
-        // ✅ PREFILL FORM (USER CAN STILL EDIT)
-        _tinController.text = profile["tin"] ?? "";
-        _idController.text = profile["identificationNumber"] ?? "";
-        _amountController.text =
-            profile["estimatedTax"]?.toString() ?? _amountController.text;
+        _aiNote = ocrResult == null
+            ? 'No OCR result yet. Upload a document first.'
+            : 'OCR data loaded for ${widget.item.title}.';
 
-        _taxType = profile["taxType"] ?? _taxType;
-        _assessmentYear = profile["assessmentYear"] ?? _assessmentYear;
-        _paymentCode = profile["paymentCode"] ?? _paymentCode;
+        final name =
+            ocrResult?.fullName ??
+            (prefill['name'] ?? profile['name'] ?? '').toString();
+        final ic =
+            ocrResult?.icNumber ??
+            (prefill['ic'] ?? profile['ic'] ?? '').toString();
+        final address =
+            ocrResult?.address ?? (profile['address'] ?? '').toString();
+        final dob = ocrResult?.dob ?? (profile['dob'] ?? '').toString();
+        final phone = ocrResult?.phone ?? (profile['phone'] ?? '').toString();
+        final income = _formatAmount(
+          ocrResult?.income ?? prefill['income'] ?? profile['income'],
+        );
+
+        if (_isTaxFiling) {
+          _nameController.text = name;
+          _tinController.text = (profile['tin'] ?? profile['tax_id'] ?? '')
+              .toString();
+          _idController.text = ic;
+          _addressController.text = address;
+          _dobController.text = dob;
+          _amountController.text = income;
+
+          final estimatedTax = profile['estimatedTax']?.toString();
+          if (_amountController.text.isEmpty &&
+              estimatedTax != null &&
+              estimatedTax.isNotEmpty) {
+            _amountController.text = estimatedTax;
+          }
+        } else if (_isEpfManagement) {
+          _epfNameController.text = name;
+          _epfIdController.text = ic;
+          _epfPhoneController.text = phone;
+          _epfEmployerController.text =
+              ocrResult?.phone ?? profile['employer_name'] ?? '';
+        } else if (_isHealthService) {
+          _healthNameController.text = name;
+          _healthIdController.text = ic;
+          _healthPhoneController.text = phone;
+          _healthDobController.text = dob;
+        } else if (_isLoanPayment) {
+          _ptptnNameController.text = name;
+          _ptptnIdController.text = ic;
+          _ptptnPhoneController.text = phone;
+        } else if (_isLicenseRenewal) {
+          _licenseNameController.text = name;
+          _licenseIdController.text = ic;
+          _licenseDobController.text = dob;
+        } else if (_isSummonsPayment) {
+          _summonsNameController.text = name;
+          _summonsIdController.text = ic;
+          _summonsPhoneController.text = phone;
+        }
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Form filled with AI suggestions ✅")),
+        SnackBar(
+          content: Text(
+            ocrResult == null
+                ? 'Profile details loaded for ${widget.item.title}.'
+                : 'OCR data applied to ${widget.item.title}.',
+          ),
+        ),
       );
     } catch (e) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text("AI fill failed: $e")));
+      ).showSnackBar(SnackBar(content: Text('AI fill failed: $e')));
     } finally {
-      setState(() => isLoading = false);
+      if (mounted) {
+        setState(() => isLoading = false);
+      }
     }
   }
 
@@ -670,55 +645,204 @@ class _ServiceActionPageState extends State<ServiceActionPage> {
     try {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
-        allowedExtensions: ['pdf', 'jpg', 'png'],
+        allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'],
         withData: true,
       );
 
-      if (result == null || result.files.first.bytes == null) return;
+      if (result == null || result.files.first.bytes == null) {
+        return;
+      }
 
       final file = result.files.first;
-
       setState(() => isLoading = true);
 
-      final user = FirebaseAuth.instance.currentUser;
-      final token = await user!.getIdToken();
-
-      final request = http.MultipartRequest(
-        "POST",
-        Uri.parse("$baseUrl/upload-doc"), // ✅ updated endpoint
+      final extracted = await AiService.instance.extractDocument(
+        bytes: file.bytes!,
+        mimeType: _mimeTypeForExtension(file.extension),
       );
+      AiDraftStore.instance.lastOcrResult = extracted;
+      _latestOcrResult = extracted;
+      _aiNote = 'OCR extracted from ${file.name}.';
 
-      request.headers["Authorization"] = "Bearer $token";
-
-      // ✅ ADD TYPE (epf, health, loan, lesen, summons)
-      request.fields["type"] = type;
-
-      request.files.add(
-        http.MultipartFile.fromBytes("file", file.bytes!, filename: file.name),
-      );
-
-      final response = await request.send();
-      final responseBody = await response.stream.bytesToString();
-
-      print("UPLOAD STATUS: ${response.statusCode}");
-      print("UPLOAD RESPONSE: $responseBody");
-
-      final data = jsonDecode(responseBody);
-
-      if (response.statusCode != 200 || data["success"] != true) {
-        throw Exception(data["error"] ?? "Upload failed");
+      if (_isTaxFiling) {
+        setState(() {
+          _nameController.text = extracted.fullName ?? _nameController.text;
+          _idController.text = extracted.icNumber ?? _idController.text;
+          _addressController.text =
+              extracted.address ?? _addressController.text;
+          _dobController.text = extracted.dob ?? _dobController.text;
+          _amountController.text = _formatAmount(extracted.income);
+        });
+      } else if (_isEpfManagement) {
+        setState(() {
+          _epfNameController.text =
+              extracted.fullName ?? _epfNameController.text;
+          _epfIdController.text = extracted.icNumber ?? _epfIdController.text;
+          _epfPhoneController.text =
+              extracted.phone ?? _epfPhoneController.text;
+        });
+      } else if (_isHealthService) {
+        setState(() {
+          _healthNameController.text =
+              extracted.fullName ?? _healthNameController.text;
+          _healthIdController.text =
+              extracted.icNumber ?? _healthIdController.text;
+          _healthPhoneController.text =
+              extracted.phone ?? _healthPhoneController.text;
+          _healthDobController.text =
+              extracted.dob ?? _healthDobController.text;
+        });
+      } else if (_isLoanPayment) {
+        setState(() {
+          _ptptnNameController.text =
+              extracted.fullName ?? _ptptnNameController.text;
+          _ptptnIdController.text =
+              extracted.icNumber ?? _ptptnIdController.text;
+          _ptptnPhoneController.text =
+              extracted.phone ?? _ptptnPhoneController.text;
+        });
+      } else if (_isLicenseRenewal) {
+        setState(() {
+          _licenseNameController.text =
+              extracted.fullName ?? _licenseNameController.text;
+          _licenseIdController.text =
+              extracted.icNumber ?? _licenseIdController.text;
+          _licenseDobController.text =
+              extracted.dob ?? _licenseDobController.text;
+        });
+      } else if (_isSummonsPayment) {
+        setState(() {
+          _summonsNameController.text =
+              extracted.fullName ?? _summonsNameController.text;
+          _summonsIdController.text =
+              extracted.icNumber ?? _summonsIdController.text;
+          _summonsPhoneController.text =
+              extracted.phone ?? _summonsPhoneController.text;
+        });
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Document uploaded successfully ✅")),
+        SnackBar(
+          content: Text(
+            _isTaxFiling
+                ? 'OCR extracted and applied to the tax form.'
+                : 'Document extracted successfully for ${widget.item.title}.',
+          ),
+        ),
       );
     } catch (e) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text("Upload failed: $e")));
+      ).showSnackBar(SnackBar(content: Text('OCR upload failed: $e')));
     } finally {
-      setState(() => isLoading = false);
+      if (mounted) {
+        setState(() => isLoading = false);
+      }
     }
+  }
+
+  String _mimeTypeForExtension(String? extension) {
+    switch (extension?.toLowerCase()) {
+      case 'jpg':
+      case 'jpeg':
+        return 'image/jpeg';
+      case 'png':
+        return 'image/png';
+      case 'pdf':
+        return 'application/pdf';
+      default:
+        return 'application/octet-stream';
+    }
+  }
+
+  String _formatAmount(dynamic value) {
+    if (value == null) {
+      return '';
+    }
+
+    if (value is num) {
+      return value.toStringAsFixed(0);
+    }
+
+    final text = value.toString().replaceAll(RegExp(r'[^0-9.]'), '');
+    if (text.isEmpty) {
+      return '';
+    }
+
+    final amount = double.tryParse(text);
+    return amount == null ? text : amount.toStringAsFixed(0);
+  }
+
+  Widget _buildAiOcrSummaryCard() {
+    final result = _latestOcrResult;
+    final note = _aiNote;
+
+    if (result == null && (note == null || note.isEmpty)) {
+      return const SizedBox.shrink();
+    }
+
+    final extractedEntries = result?.extracted.entries.where((entry) {
+      final value = entry.value?.toString().trim();
+      return value != null && value.isNotEmpty && value.toLowerCase() != 'null';
+    }).toList();
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(top: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEFF8F2),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFD7EBDD)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'AI document summary',
+            style: TextStyle(
+              color: Color(0xFF1E2D3F),
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          if (note != null && note.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              note,
+              style: const TextStyle(
+                color: Color(0xFF607489),
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+          if (result != null) ...[
+            const SizedBox(height: 8),
+            if (extractedEntries == null || extractedEntries.isEmpty)
+              const Text('No extracted fields found from the latest upload.')
+            else
+              ...extractedEntries.map(
+                (entry) => Padding(
+                  padding: const EdgeInsets.only(bottom: 2),
+                  child: Text(
+                    '${_formatExtractedLabel(entry.key)}: ${entry.value}',
+                  ),
+                ),
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  String _formatExtractedLabel(String key) {
+    return key
+        .replaceAll('_', ' ')
+        .split(' ')
+        .where((part) => part.isNotEmpty)
+        .map((part) => '${part[0].toUpperCase()}${part.substring(1)}')
+        .join(' ');
   }
 
   void _submitTaxPayment() {
@@ -732,396 +856,169 @@ class _ServiceActionPageState extends State<ServiceActionPage> {
     Navigator.of(context).pushNamed('/payments');
   }
 
-  void _saveDraft() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('${widget.item.title} draft saved.')),
-    );
-  }
-
-  String get _submitButtonLabel => switch (widget.item.title) {
-    'Tax Filing' => 'Pay Tax Now',
-    'EPF Management' => 'Submit Application',
-    'Health Services' => 'Book Appointment',
-    'Loan Payment' => 'Submit Payment',
-    'License Renewal' => 'Renew License',
-    'Summons Payment' => 'Pay Summons',
-    'MyKad Replacement' => 'Submit Request',
-    'Birth Certificate Extract' => 'Request Extract',
-    'Marriage Registration' => 'Book Appointment',
-    'Passport Renewal' => 'Renew Passport',
-    'Road Tax Renewal' => 'Renew Road Tax',
-    'Business Registration' => 'Register Business',
-    'Legal Aid' => 'Submit Appeal',
-    'Vehicle Ownership Transfer' => 'Submit Transfer',
-    'eKasih Registration' => 'Submit Registration',
-    'Tax Refund Status' => 'Check Refund',
-    'Zakat Payment' => 'Pay Zakat',
-    'Public Complaints (SISPAA)' => 'Submit Complaint',
-    'Civil Service Recruitment' => 'Submit Application',
-    'Welfare Aid (eBantuan)' => 'Apply Now',
-    'SOCSO Claims' => 'Submit Claim',
-    'PR1MA Housing' => 'Apply Now',
-    'Assessment Tax / Quit Rent' => 'Pay Now',
-    'UPU Online' => 'Submit UPU',
-    'Tabung Haji Services' => 'Proceed',
-    'MyFutureJobs' => 'Apply Now',
-    _ => 'Submit',
-  };
-
-  void _submitCurrentService() {
-    if (!(_formKey.currentState?.validate() ?? false)) {
-      return;
-    }
-
-    if (_isTaxFiling) {
-      _submitTaxPayment();
-      return;
-    }
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('${widget.item.title} submitted successfully.')),
-    );
-  }
-
-  @override
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
+      backgroundColor: const Color(0xFFF5F5F7),
       appBar: AppBar(
         title: Text(widget.item.title),
         backgroundColor: Colors.transparent,
-        foregroundColor: theme.colorScheme.onSurfaceVariant,
+        foregroundColor: const Color(0xFF1E2D3F),
         elevation: 0,
         scrolledUnderElevation: 0,
       ),
       body: Padding(
         padding: const EdgeInsets.all(16),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surface,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: theme.dividerColor),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 42,
-                      height: 42,
-                      decoration: BoxDecoration(
-                        color: widget.item.iconBg,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(
-                        widget.item.icon,
-                        color: widget.item.iconColor,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            widget.item.title,
-                            style: TextStyle(
-                              color: theme.colorScheme.onSurfaceVariant,
-                              fontSize: 18,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          const SizedBox(height: 3),
-                          Text(
-                            'Agency: ${widget.item.subtitle}',
-                            style: TextStyle(
-                              color: theme.colorScheme.onSurfaceVariant,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFD9DEE5)),
               ),
-              const SizedBox(height: 14),
-              Expanded(
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    return SingleChildScrollView(
-                      child: ConstrainedBox(
-                        constraints: BoxConstraints(
-                          minHeight: constraints.maxHeight,
-                        ),
-                        child: _isTaxFiling
-                            ? _buildTaxForm()
-                            : _isEpfManagement
-                            ? _buildEpfForm()
-                            : _isHealthService
-                            ? _buildHealthForm()
-                            : _isLoanPayment
-                            ? _buildLoanPaymentForm()
-                            : _isLicenseRenewal
-                            ? _buildLicenseRenewalForm()
-                            : _isSummonsPayment
-                            ? _buildSummonsPaymentForm()
-                            : _buildGenericForm(),
-                      ),
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(height: 12),
-              Row(
+              child: Row(
                 children: [
-                  Expanded(
-                    child: SizedBox(
-                      height: 42,
-                      child: OutlinedButton(
-                        onPressed: _saveDraft,
-                        style: OutlinedButton.styleFrom(
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                        child: const Text(
-                          'Save Draft',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 13,
-                          ),
-                        ),
-                      ),
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: widget.item.iconBg,
+                      borderRadius: BorderRadius.circular(12),
                     ),
+                    child: Icon(widget.item.icon, color: widget.item.iconColor),
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 12),
                   Expanded(
-                    child: SizedBox(
-                      height: 42,
-                      child: FilledButton(
-                        style: FilledButton.styleFrom(
-                          backgroundColor: const Color(0xFF214B74),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                        onPressed: _submitCurrentService,
-                        child: Text(
-                          _submitButtonLabel,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.item.title,
                           style: const TextStyle(
+                            color: Color(0xFF1E2D3F),
+                            fontSize: 18,
                             fontWeight: FontWeight.w700,
-                            fontSize: 13,
                           ),
                         ),
-                      ),
+                        const SizedBox(height: 3),
+                        Text(
+                          'Agency: ${widget.item.subtitle}',
+                          style: const TextStyle(
+                            color: Color(0xFF6F8094),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
-            ],
-          ),
+            ),
+            const SizedBox(height: 14),
+            Expanded(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  return SingleChildScrollView(
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        minHeight: constraints.maxHeight,
+                      ),
+                      child: _isTaxFiling
+                          ? _buildTaxForm()
+                          : _isEpfManagement
+                          ? _buildEpfForm()
+                          : _isHealthService
+                          ? _buildHealthForm()
+                          : _isLoanPayment
+                          ? _buildLoanPaymentForm()
+                          : _isLicenseRenewal
+                          ? _buildLicenseRenewalForm()
+                          : _isSummonsPayment
+                          ? _buildSummonsPaymentForm()
+                          : _buildGenericForm(),
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              height: 42,
+              child: FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF214B74),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                onPressed: _isTaxFiling
+                    ? _submitTaxPayment
+                    : () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              '${widget.item.title} service started.',
+                            ),
+                          ),
+                        );
+                      },
+                child: Text(
+                  _isTaxFiling ? 'Pay Tax Now' : 'Proceed',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 
   Widget _buildGenericForm() {
-    final config =
-        _serviceFormConfigs[widget.item.title] ??
-        _defaultServiceFormConfig(widget.item);
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Theme.of(context).dividerColor),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '${widget.item.title} Registration',
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurface,
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Part 1: Upload supporting documents (UI only placeholder for auto-fill).',
-            style: TextStyle(color: Color(0xFF6F8094), fontSize: 12),
-          ),
-          const SizedBox(height: 10),
-          _buildUploadCard(config),
-          if (config.suggestedDocuments.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            const Text(
-              'Suggested documents',
-              style: TextStyle(
-                color: Color(0xFF1E2D3F),
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 8),
-            ...config.suggestedDocuments.map(_buildDocumentChip),
-          ],
-          const SizedBox(height: 12),
-          const Text(
-            'Part 2: Manual form fill',
-            style: TextStyle(
-              color: Color(0xFF1E2D3F),
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 10),
-          ...config.sections.map(
-            (section) => _buildInfoSection(
-              section.title,
-              _buildSectionRows(section.rows),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildUploadCard(_ServiceFormConfig config) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFDCE5F0)),
+        border: Border.all(color: const Color(0xFFD9DEE5)),
       ),
-      child: Column(
+      child: const Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE8F4FE),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(
-                  Icons.upload_file_outlined,
-                  color: Color(0xFF3DA5F5),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      config.uploadTitle,
-                      style: const TextStyle(
-                        color: Color(0xFF1E2D3F),
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      config.uploadHint,
-                      style: const TextStyle(
-                        color: Color(0xFF607489),
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            height: 42,
-            child: OutlinedButton.icon(
-              onPressed: () {},
-              icon: const Icon(Icons.file_upload_outlined),
-              label: const Text('Choose Document'),
+          Text(
+            'Start Service',
+            style: TextStyle(
+              color: Color(0xFF1E2D3F),
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
             ),
           ),
-          const SizedBox(height: 10),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: const Color(0xFFDCE5F0)),
+          SizedBox(height: 10),
+          TextField(
+            decoration: InputDecoration(
+              labelText: 'Identification Number',
+              border: OutlineInputBorder(),
             ),
-            child: const Text(
-              'Auto-fill is UI placeholder only. Accepted files: PDF, JPG, PNG (up to 10MB).',
-              style: TextStyle(
-                color: Color(0xFF6F8094),
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-              ),
+          ),
+          SizedBox(height: 10),
+          TextField(
+            decoration: InputDecoration(
+              labelText: 'Reference (optional)',
+              border: OutlineInputBorder(),
             ),
           ),
         ],
       ),
-    );
-  }
-
-  List<Widget> _buildSectionRows(List<List<String>> rows) {
-    return rows
-        .map(
-          (row) => row.length == 2
-              ? _buildInfoPair(row[0], row[1])
-              : _buildInfoField(row.first),
-        )
-        .toList();
-  }
-
-  _ServiceFormConfig _defaultServiceFormConfig(ServiceItem item) {
-    return _ServiceFormConfig(
-      uploadTitle: 'Upload ${item.title} document',
-      uploadHint:
-          'Attach available references for ${item.title} before manual submission.',
-      suggestedDocuments: const [
-        'MyKad / Passport copy',
-        'Latest supporting document',
-      ],
-      sections: const [
-        _ServiceFormSection(
-          title: '1. Applicant Information',
-          rows: [
-            ['Full Name'],
-            ['IC Number / Passport'],
-            ['Phone Number', 'Email Address'],
-          ],
-        ),
-        _ServiceFormSection(
-          title: '2. Application Details',
-          rows: [
-            ['Application Type'],
-            ['Reference Number (if any)'],
-            ['Notes / Additional Details'],
-          ],
-        ),
-      ],
     );
   }
 
@@ -1130,41 +1027,34 @@ class _ServiceActionPageState extends State<ServiceActionPage> {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Theme.of(context).dividerColor),
+        border: Border.all(color: const Color(0xFFD9DEE5)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'EPF Document Upload',
+          const Text(
+            'EPF (KWSP) Management',
             style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurface,
+              color: Color(0xFF1E2D3F),
               fontSize: 16,
               fontWeight: FontWeight.w700,
             ),
           ),
           const SizedBox(height: 8),
-          Text(
+          const Text(
             'Upload your supporting documents before continuing with EPF services.',
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-              fontSize: 12,
-            ),
+            style: TextStyle(color: Color(0xFF6F8094), fontSize: 12),
           ),
           const SizedBox(height: 14),
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: Theme.of(
-                context,
-              ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+              color: const Color(0xFFF5F8FC),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: Theme.of(context).dividerColor.withValues(alpha: 0.5),
-              ),
+              border: Border.all(color: const Color(0xFFDCE5F0)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1175,25 +1065,23 @@ class _ServiceActionPageState extends State<ServiceActionPage> {
                       width: 42,
                       height: 42,
                       decoration: BoxDecoration(
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.primary.withValues(alpha: 0.15),
+                        color: const Color(0xFFE8F4FE),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: Icon(
+                      child: const Icon(
                         Icons.upload_file_outlined,
-                        color: Theme.of(context).colorScheme.primary,
+                        color: Color(0xFF3DA5F5),
                       ),
                     ),
                     const SizedBox(width: 12),
-                    Expanded(
+                    const Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
                             'Upload document',
                             style: TextStyle(
-                              color: Theme.of(context).colorScheme.onSurface,
+                              color: Color(0xFF1E2D3F),
                               fontSize: 14,
                               fontWeight: FontWeight.w700,
                             ),
@@ -1202,9 +1090,7 @@ class _ServiceActionPageState extends State<ServiceActionPage> {
                           Text(
                             'PDF, JPG, PNG up to 10MB each. Scan clearly for faster verification.',
                             style: TextStyle(
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.onSurfaceVariant,
+                              color: Color(0xFF607489),
                               fontSize: 12,
                             ),
                           ),
@@ -1213,14 +1099,12 @@ class _ServiceActionPageState extends State<ServiceActionPage> {
                     ),
                   ],
                 ),
-
                 const SizedBox(height: 12),
-
                 SizedBox(
                   width: double.infinity,
                   height: 42,
                   child: OutlinedButton.icon(
-                    onPressed: () => uploadDocument("kwsp"),
+                    onPressed: () => uploadDocument('epf'),
                     icon: const Icon(Icons.file_upload_outlined),
                     label: const Text('Choose File'),
                   ),
@@ -1232,14 +1116,13 @@ class _ServiceActionPageState extends State<ServiceActionPage> {
                   width: double.infinity,
                   height: 42,
                   child: FilledButton.icon(
-                    onPressed: fillWithAI, // added
+                    onPressed: fillWithAI,
                     icon: const Icon(Icons.auto_awesome),
                     label: const Text('Auto Fill with AI'),
                   ),
                 ),
 
                 const SizedBox(height: 10),
-
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(
@@ -1247,41 +1130,55 @@ class _ServiceActionPageState extends State<ServiceActionPage> {
                     vertical: 10,
                   ),
                   decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surface,
+                    color: Colors.white,
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: Theme.of(
-                        context,
-                      ).dividerColor.withValues(alpha: 0.5),
-                    ),
+                    border: Border.all(color: const Color(0xFFDCE5F0)),
                   ),
-                  child: Text(
+                  child: const Text(
                     'Accepted files: identification proof, employment letter, salary slip, EPF statement, or any supporting PDF/image.',
                     style: TextStyle(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      color: Color(0xFF6F8094),
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
+                _buildAiOcrSummaryCard(),
               ],
             ),
           ),
           const SizedBox(height: 14),
-          Text(
-            'Suggested documents',
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurface,
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
+
+          // ===== FORM FIELDS USING CONTROLLERS =====
+          const Text(
+            '1. Member Information',
+            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+          ),
+          const SizedBox(height: 8),
+          TextFormField(
+            controller: _epfNameController,
+            decoration: const InputDecoration(
+              labelText: 'Full Name',
+              border: OutlineInputBorder(),
             ),
           ),
           const SizedBox(height: 10),
-          _buildDocumentChip('MyKad / Passport copy'),
-          _buildDocumentChip('Employment confirmation letter'),
-          _buildDocumentChip('Latest salary slip'),
-          _buildDocumentChip('EPF account statement'),
-          _buildDocumentChip('Supporting withdrawal or contribution document'),
+          TextFormField(
+            controller: _epfIdController,
+            decoration: const InputDecoration(
+              labelText: 'IC Number (MyKad)',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 10),
+          TextFormField(
+            controller: _epfPhoneController,
+            decoration: const InputDecoration(
+              labelText: 'Phone Number',
+              border: OutlineInputBorder(),
+            ),
+          ),
+
           const SizedBox(height: 14),
           _buildInfoSection('1. Member (User) Information', [
             _buildInfoField('Full Name'),
@@ -1356,17 +1253,17 @@ class _ServiceActionPageState extends State<ServiceActionPage> {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
+        color: const Color(0xFFF8FAFC),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Theme.of(context).dividerColor),
+        border: Border.all(color: const Color(0xFFD9E2EC)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             title,
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurface,
+            style: const TextStyle(
+              color: Color(0xFF1E2D3F),
               fontSize: 14,
               fontWeight: FontWeight.w700,
             ),
@@ -1381,7 +1278,7 @@ class _ServiceActionPageState extends State<ServiceActionPage> {
   Widget _buildInfoField(String label) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
-      child: TextFormField(
+      child: TextField(
         decoration: InputDecoration(
           labelText: label,
           border: const OutlineInputBorder(),
@@ -1390,7 +1287,6 @@ class _ServiceActionPageState extends State<ServiceActionPage> {
             vertical: 10,
           ),
         ),
-        validator: (value) => _validateField(label, value),
       ),
     );
   }
@@ -1408,102 +1304,39 @@ class _ServiceActionPageState extends State<ServiceActionPage> {
     );
   }
 
-  String? _validateField(String label, String? value) {
-    final text = value?.trim() ?? '';
-    final lowerLabel = label.toLowerCase();
-    final isOptional =
-        lowerLabel.contains('optional') || lowerLabel.contains('if any');
-
-    if (text.isEmpty) {
-      return isOptional ? null : '$label is required';
-    }
-
-    if (lowerLabel.contains('email')) {
-      final emailPattern = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
-      if (!emailPattern.hasMatch(text)) {
-        return 'Enter a valid email address';
-      }
-    }
-
-    if (lowerLabel.contains('phone')) {
-      final phonePattern = RegExp(r'^[0-9+\-\s]{8,15}$');
-      if (!phonePattern.hasMatch(text)) {
-        return 'Enter a valid phone number';
-      }
-    }
-
-    if (lowerLabel.contains('amount') ||
-        lowerLabel.contains('income') ||
-        lowerLabel.contains('salary')) {
-      if (double.tryParse(text.replaceAll(',', '')) == null) {
-        return 'Enter a valid amount';
-      }
-    }
-
-    if (lowerLabel.contains('year')) {
-      final yearPattern = RegExp(r'^\d{4}$');
-      if (!yearPattern.hasMatch(text)) {
-        return 'Enter a valid year';
-      }
-    }
-
-    if (lowerLabel.contains('ic number') ||
-        lowerLabel.contains('mykad') ||
-        lowerLabel.contains('passport')) {
-      if (text.length < 6) {
-        return 'Enter a valid identification number';
-      }
-    }
-
-    if (lowerLabel.contains('tin')) {
-      if (text.length < 6) {
-        return 'Enter a valid TIN';
-      }
-    }
-
-    return null;
-  }
-
   Widget _buildHealthForm() {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Theme.of(context).dividerColor),
+        border: Border.all(color: const Color(0xFFD9DEE5)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
+          const Text(
             'Health Service Registration',
             style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurface,
+              color: Color(0xFF1E2D3F),
               fontSize: 16,
               fontWeight: FontWeight.w700,
             ),
           ),
           const SizedBox(height: 8),
-          Text(
+          const Text(
             'Upload supporting documents, then fill in the required health registration details manually.',
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-              fontSize: 12,
-            ),
+            style: TextStyle(color: Color(0xFF6F8094), fontSize: 12),
           ),
           const SizedBox(height: 14),
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: Theme.of(
-                context,
-              ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+              color: const Color(0xFFF5F8FC),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: Theme.of(context).dividerColor.withValues(alpha: 0.5),
-              ),
+              border: Border.all(color: const Color(0xFFDCE5F0)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1514,36 +1347,32 @@ class _ServiceActionPageState extends State<ServiceActionPage> {
                       width: 42,
                       height: 42,
                       decoration: BoxDecoration(
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.primary.withValues(alpha: 0.15),
+                        color: const Color(0xFFE8F4FE),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: Icon(
+                      child: const Icon(
                         Icons.upload_file_outlined,
-                        color: Theme.of(context).colorScheme.primary,
+                        color: Color(0xFF3DA5F5),
                       ),
                     ),
                     const SizedBox(width: 12),
-                    Expanded(
+                    const Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
                             'Upload health document',
                             style: TextStyle(
-                              color: Theme.of(context).colorScheme.onSurface,
+                              color: Color(0xFF1E2D3F),
                               fontSize: 14,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
                           SizedBox(height: 2),
                           Text(
-                            'Medical card, referral letter, or previous reports (UI placeholder only).',
+                            'Medical card, referral letter, or previous reports.',
                             style: TextStyle(
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.onSurfaceVariant,
+                              color: Color(0xFF607489),
                               fontSize: 12,
                             ),
                           ),
@@ -1552,17 +1381,14 @@ class _ServiceActionPageState extends State<ServiceActionPage> {
                     ),
                   ],
                 ),
-
                 const SizedBox(height: 12),
-
-                // keep UI same, only add function
                 SizedBox(
                   width: double.infinity,
                   height: 42,
                   child: OutlinedButton.icon(
-                    onPressed: () => uploadDocument("kkm"),
+                    onPressed: () => uploadDocument('kkm'),
                     icon: const Icon(Icons.file_upload_outlined),
-                    label: const Text('Choose Document'),
+                    label: const Text('Upload Document'),
                   ),
                 ),
 
@@ -1572,14 +1398,13 @@ class _ServiceActionPageState extends State<ServiceActionPage> {
                   width: double.infinity,
                   height: 42,
                   child: FilledButton.icon(
-                    onPressed: fillWithAI, // added
+                    onPressed: fillWithAI,
                     icon: const Icon(Icons.auto_awesome),
                     label: const Text('Auto Fill with AI'),
                   ),
                 ),
 
                 const SizedBox(height: 10),
-
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(
@@ -1587,23 +1412,20 @@ class _ServiceActionPageState extends State<ServiceActionPage> {
                     vertical: 10,
                   ),
                   decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surface,
+                    color: Colors.white,
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: Theme.of(
-                        context,
-                      ).dividerColor.withValues(alpha: 0.5),
-                    ),
+                    border: Border.all(color: const Color(0xFFDCE5F0)),
                   ),
-                  child: Text(
+                  child: const Text(
                     'Accepted files: PDF, JPG, PNG (ID card, insurance card, medical report).',
                     style: TextStyle(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      color: Color(0xFF6F8094),
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
+                _buildAiOcrSummaryCard(),
               ],
             ),
           ),
@@ -1672,41 +1494,34 @@ class _ServiceActionPageState extends State<ServiceActionPage> {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Theme.of(context).dividerColor),
+        border: Border.all(color: const Color(0xFFD9DEE5)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
+          const Text(
             'PTPTN Loan Payment',
             style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurface,
+              color: Color(0xFF1E2D3F),
               fontSize: 16,
               fontWeight: FontWeight.w700,
             ),
           ),
           const SizedBox(height: 8),
-          Text(
+          const Text(
             'Upload supporting documents and fill in payment details manually.',
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-              fontSize: 12,
-            ),
+            style: TextStyle(color: Color(0xFF6F8094), fontSize: 12),
           ),
           const SizedBox(height: 14),
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: Theme.of(
-                context,
-              ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+              color: const Color(0xFFF5F8FC),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: Theme.of(context).dividerColor.withValues(alpha: 0.5),
-              ),
+              border: Border.all(color: const Color(0xFFDCE5F0)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1717,25 +1532,23 @@ class _ServiceActionPageState extends State<ServiceActionPage> {
                       width: 42,
                       height: 42,
                       decoration: BoxDecoration(
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.primary.withValues(alpha: 0.15),
+                        color: const Color(0xFFE8F4FE),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: Icon(
+                      child: const Icon(
                         Icons.upload_file_outlined,
-                        color: Theme.of(context).colorScheme.primary,
+                        color: Color(0xFF3DA5F5),
                       ),
                     ),
                     const SizedBox(width: 12),
-                    Expanded(
+                    const Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
                             'Upload payment document',
                             style: TextStyle(
-                              color: Theme.of(context).colorScheme.onSurface,
+                              color: Color(0xFF1E2D3F),
                               fontSize: 14,
                               fontWeight: FontWeight.w700,
                             ),
@@ -1744,9 +1557,7 @@ class _ServiceActionPageState extends State<ServiceActionPage> {
                           Text(
                             'Optional: PTPTN statement, previous receipt, or payment reference slip.',
                             style: TextStyle(
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.onSurfaceVariant,
+                              color: Color(0xFF607489),
                               fontSize: 12,
                             ),
                           ),
@@ -1755,16 +1566,14 @@ class _ServiceActionPageState extends State<ServiceActionPage> {
                     ),
                   ],
                 ),
-
                 const SizedBox(height: 12),
-
                 SizedBox(
                   width: double.infinity,
                   height: 42,
                   child: OutlinedButton.icon(
-                    onPressed: () => uploadDocument("ptptn"),
+                    onPressed: () => uploadDocument('ptptn'),
                     icon: const Icon(Icons.file_upload_outlined),
-                    label: const Text('Choose Document'),
+                    label: const Text('Upload Document'),
                   ),
                 ),
 
@@ -1774,14 +1583,13 @@ class _ServiceActionPageState extends State<ServiceActionPage> {
                   width: double.infinity,
                   height: 42,
                   child: FilledButton.icon(
-                    onPressed: fillWithAI, // 👈 added
+                    onPressed: fillWithAI,
                     icon: const Icon(Icons.auto_awesome),
                     label: const Text('Auto Fill with AI'),
                   ),
                 ),
 
                 const SizedBox(height: 10),
-
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(
@@ -1789,23 +1597,20 @@ class _ServiceActionPageState extends State<ServiceActionPage> {
                     vertical: 10,
                   ),
                   decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surface,
+                    color: Colors.white,
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: Theme.of(
-                        context,
-                      ).dividerColor.withValues(alpha: 0.5),
-                    ),
+                    border: Border.all(color: const Color(0xFFDCE5F0)),
                   ),
-                  child: Text(
-                    'Accepted files: PDF, JPG, PNG. UI only (no backend upload).',
+                  child: const Text(
+                    'Upload: PDF, JPG, PNG documents. Auto Fill will extract borrower details automatically.',
                     style: TextStyle(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      color: Color(0xFF6F8094),
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
+                _buildAiOcrSummaryCard(),
               ],
             ),
           ),
@@ -1870,41 +1675,34 @@ class _ServiceActionPageState extends State<ServiceActionPage> {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Theme.of(context).dividerColor),
+        border: Border.all(color: const Color(0xFFD9DEE5)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Licence Renewal',
+          const Text(
+            'Licence Renewal (JPJ)',
             style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurface,
+              color: Color(0xFF1E2D3F),
               fontSize: 16,
               fontWeight: FontWeight.w700,
             ),
           ),
           const SizedBox(height: 8),
-          Text(
+          const Text(
             'Upload your photo or use the existing JPJ photo, then complete the renewal details below.',
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-              fontSize: 12,
-            ),
+            style: TextStyle(color: Color(0xFF6F8094), fontSize: 12),
           ),
           const SizedBox(height: 14),
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: Theme.of(
-                context,
-              ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+              color: const Color(0xFFF5F8FC),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: Theme.of(context).dividerColor.withValues(alpha: 0.5),
-              ),
+              border: Border.all(color: const Color(0xFFDCE5F0)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1915,36 +1713,32 @@ class _ServiceActionPageState extends State<ServiceActionPage> {
                       width: 42,
                       height: 42,
                       decoration: BoxDecoration(
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.primary.withValues(alpha: 0.15),
+                        color: const Color(0xFFE8F4FE),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: Icon(
-                        Icons.photo_camera_outlined,
-                        color: Theme.of(context).colorScheme.primary,
+                      child: const Icon(
+                        Icons.upload_file_outlined,
+                        color: Color(0xFF3DA5F5),
                       ),
                     ),
                     const SizedBox(width: 12),
-                    Expanded(
+                    const Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Photo upload / existing photo',
+                            'Upload document',
                             style: TextStyle(
-                              color: Theme.of(context).colorScheme.onSurface,
+                              color: Color(0xFF1E2D3F),
                               fontSize: 14,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
                           SizedBox(height: 2),
                           Text(
-                            'Passport-style photo or existing JPJ photo placeholder (UI only).',
+                            'Current license, IC, or supporting documents.',
                             style: TextStyle(
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.onSurfaceVariant,
+                              color: Color(0xFF607489),
                               fontSize: 12,
                             ),
                           ),
@@ -1953,49 +1747,27 @@ class _ServiceActionPageState extends State<ServiceActionPage> {
                     ),
                   ],
                 ),
-
                 const SizedBox(height: 12),
-
-                // ONLY CHANGE: add function
                 SizedBox(
                   width: double.infinity,
                   height: 42,
                   child: OutlinedButton.icon(
-                    onPressed: () => uploadDocument("jpj"),
+                    onPressed: () => uploadDocument('jpj'),
                     icon: const Icon(Icons.file_upload_outlined),
-                    label: const Text('Upload Photo'),
+                    label: const Text('Upload Document'),
                   ),
                 ),
-
                 const SizedBox(height: 8),
-
-                // ONLY CHANGE: add AI autofill if needed
-                SizedBox(
-                  width: double.infinity,
-                  height: 42,
-                  child: FilledButton.icon(
-                    onPressed: fillWithAI, // reused AI function
-                    icon: const Icon(Icons.auto_awesome),
-                    label: const Text('Auto Fill with AI'),
-                  ),
-                ),
-
-                const SizedBox(height: 8),
-
-                // keep existing second button UI but still functional if you want
                 SizedBox(
                   width: double.infinity,
                   height: 42,
                   child: OutlinedButton.icon(
-                    onPressed:
-                        () {}, // optional: keep or map to uploadDocument too
+                    onPressed: () => uploadDocument('jpj'),
                     icon: const Icon(Icons.photo_library_outlined),
                     label: const Text('Use Existing JPJ Photo'),
                   ),
                 ),
-
                 const SizedBox(height: 10),
-
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(
@@ -2003,23 +1775,20 @@ class _ServiceActionPageState extends State<ServiceActionPage> {
                     vertical: 10,
                   ),
                   decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surface,
+                    color: Colors.white,
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: Theme.of(
-                        context,
-                      ).dividerColor.withValues(alpha: 0.5),
-                    ),
+                    border: Border.all(color: const Color(0xFFDCE5F0)),
                   ),
-                  child: Text(
-                    'Accepted files: JPG, PNG, PDF for supporting documents. UI placeholder only.',
+                  child: const Text(
+                    'Accepted files: PDF, JPG, PNG (current license, IC, medical form if required).',
                     style: TextStyle(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      color: Color(0xFF6F8094),
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
+                _buildAiOcrSummaryCard(),
               ],
             ),
           ),
@@ -2081,44 +1850,34 @@ class _ServiceActionPageState extends State<ServiceActionPage> {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Theme.of(context).dividerColor),
+        border: Border.all(color: const Color(0xFFD9DEE5)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
+          const Text(
             'Summons Payment',
             style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurface,
+              color: Color(0xFF1E2D3F),
               fontSize: 16,
               fontWeight: FontWeight.w700,
             ),
           ),
           const SizedBox(height: 8),
-          Text(
+          const Text(
             'Enter your identification details to auto-fetch summons records, then complete the payment UI below.',
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-              fontSize: 12,
-            ),
+            style: TextStyle(color: Color(0xFF6F8094), fontSize: 12),
           ),
-
           const SizedBox(height: 14),
-
-          // ===== UPLOAD CARD (ONLY ONE - FIXED) =====
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: Theme.of(
-                context,
-              ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+              color: const Color(0xFFF5F8FC),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: Theme.of(context).dividerColor.withValues(alpha: 0.5),
-              ),
+              border: Border.all(color: const Color(0xFFDCE5F0)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -2129,25 +1888,23 @@ class _ServiceActionPageState extends State<ServiceActionPage> {
                       width: 42,
                       height: 42,
                       decoration: BoxDecoration(
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.primary.withValues(alpha: 0.15),
+                        color: const Color(0xFFE8F4FE),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: Icon(
+                      child: const Icon(
                         Icons.upload_file_outlined,
-                        color: Theme.of(context).colorScheme.primary,
+                        color: Color(0xFF3DA5F5),
                       ),
                     ),
                     const SizedBox(width: 12),
-                    Expanded(
+                    const Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
                             'Summons lookup document',
                             style: TextStyle(
-                              color: Theme.of(context).colorScheme.onSurface,
+                              color: Color(0xFF1E2D3F),
                               fontSize: 14,
                               fontWeight: FontWeight.w700,
                             ),
@@ -2156,9 +1913,7 @@ class _ServiceActionPageState extends State<ServiceActionPage> {
                           Text(
                             'Optional document upload placeholder for summons notice or related file.',
                             style: TextStyle(
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.onSurfaceVariant,
+                              color: Color(0xFF607489),
                               fontSize: 12,
                             ),
                           ),
@@ -2167,35 +1922,17 @@ class _ServiceActionPageState extends State<ServiceActionPage> {
                     ),
                   ],
                 ),
-
                 const SizedBox(height: 12),
-
-                // Upload button
                 SizedBox(
                   width: double.infinity,
                   height: 42,
                   child: OutlinedButton.icon(
-                    onPressed: () => uploadDocument("pdrm"),
+                    onPressed: () => uploadDocument('pdrm'),
                     icon: const Icon(Icons.file_upload_outlined),
                     label: const Text('Upload Summons Document'),
                   ),
                 ),
-
-                const SizedBox(height: 8),
-
-                // AI autofill button
-                SizedBox(
-                  width: double.infinity,
-                  height: 42,
-                  child: FilledButton.icon(
-                    onPressed: fillWithAI,
-                    icon: const Icon(Icons.auto_awesome),
-                    label: const Text('Auto Fill with AI'),
-                  ),
-                ),
-
                 const SizedBox(height: 10),
-
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(
@@ -2203,18 +1940,14 @@ class _ServiceActionPageState extends State<ServiceActionPage> {
                     vertical: 10,
                   ),
                   decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surface,
+                    color: Colors.white,
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: Theme.of(
-                        context,
-                      ).dividerColor.withValues(alpha: 0.5),
-                    ),
+                    border: Border.all(color: const Color(0xFFDCE5F0)),
                   ),
-                  child: Text(
-                    'Accepted files: summons notice, notice image, or supporting PDF/image.',
+                  child: const Text(
+                    'Accepted files: summons notice, notice image, or supporting PDF/image. UI only.',
                     style: TextStyle(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      color: Color(0xFF6F8094),
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
                     ),
@@ -2223,10 +1956,7 @@ class _ServiceActionPageState extends State<ServiceActionPage> {
               ],
             ),
           ),
-
           const SizedBox(height: 14),
-
-          // ===== REST OF YOUR FORM (UNCHANGED) =====
           _buildInfoSection('1. Identification (VERY IMPORTANT)', [
             _buildInfoField('IC Number (MyKad)'),
             _buildInfoField('Vehicle Plate Number'),
@@ -2288,9 +2018,9 @@ class _ServiceActionPageState extends State<ServiceActionPage> {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
+        color: const Color(0xFFF7F8FA),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Theme.of(context).dividerColor),
+        border: Border.all(color: const Color(0xFFD9DEE5)),
       ),
       child: Row(
         children: [
@@ -2298,14 +2028,12 @@ class _ServiceActionPageState extends State<ServiceActionPage> {
             width: 28,
             height: 28,
             decoration: BoxDecoration(
-              color: Theme.of(
-                context,
-              ).colorScheme.primary.withValues(alpha: 0.15),
+              color: const Color(0xFFE8F4FE),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Icon(
+            child: const Icon(
               Icons.description_outlined,
-              color: Theme.of(context).colorScheme.primary,
+              color: Color(0xFF3DA5F5),
               size: 16,
             ),
           ),
@@ -2313,8 +2041,8 @@ class _ServiceActionPageState extends State<ServiceActionPage> {
           Expanded(
             child: Text(
               label,
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurface,
+              style: const TextStyle(
+                color: Color(0xFF1E2D3F),
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
               ),
@@ -2340,76 +2068,68 @@ class _ServiceActionPageState extends State<ServiceActionPage> {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Theme.of(context).dividerColor),
+        border: Border.all(color: const Color(0xFFD9DEE5)),
       ),
       child: Form(
         key: _formKey,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
+            const Text(
               'Tax Payment Details',
               style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurface,
+                color: Color(0xFF1E2D3F),
                 fontSize: 16,
                 fontWeight: FontWeight.w700,
               ),
             ),
             const SizedBox(height: 10),
+
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Theme.of(
-                  context,
-                ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                color: const Color(0xFFF5F8FC),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                  color: Theme.of(context).dividerColor.withValues(alpha: 0.5),
-                ),
+                border: Border.all(color: const Color(0xFFDCE5F0)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // ===== HEADER =====
                   Row(
                     children: [
                       Container(
                         width: 40,
                         height: 40,
                         decoration: BoxDecoration(
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.primary.withValues(alpha: 0.15),
+                          color: const Color(0xFFE8F4FE),
                           borderRadius: BorderRadius.circular(10),
                         ),
-                        child: Icon(
+                        child: const Icon(
                           Icons.upload_file_outlined,
-                          color: Theme.of(context).colorScheme.primary,
+                          color: Color(0xFF3DA5F5),
                         ),
                       ),
                       const SizedBox(width: 10),
-                      Expanded(
+                      const Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Tax Document & AI Autofill',
+                              'Upload Tax Document',
                               style: TextStyle(
-                                color: Theme.of(context).colorScheme.onSurface,
+                                color: Color(0xFF1E2D3F),
                                 fontSize: 14,
                                 fontWeight: FontWeight.w700,
                               ),
                             ),
                             SizedBox(height: 2),
                             Text(
-                              'Upload document or use AI to auto-fill form fields',
+                              'UI only for now. Uploaded tax document will be used to auto-fill this form later.',
                               style: TextStyle(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.onSurfaceVariant,
+                                color: Color(0xFF607489),
                                 fontSize: 12,
                               ),
                             ),
@@ -2418,36 +2138,17 @@ class _ServiceActionPageState extends State<ServiceActionPage> {
                       ),
                     ],
                   ),
-
-                  const SizedBox(height: 12),
-
-                  // ===== UPLOAD BUTTON =====
-                  SizedBox(
-                    width: double.infinity,
-                    height: 42,
-                    child: OutlinedButton.icon(
-                      onPressed: () => uploadDocument("lhdn"),
-                      icon: const Icon(Icons.upload_file),
-                      label: const Text("Upload Document"),
-                    ),
-                  ),
-
-                  const SizedBox(height: 8),
-
-                  // ===== AUTO FILL BUTTON =====
-                  SizedBox(
-                    width: double.infinity,
-                    height: 42,
-                    child: FilledButton.icon(
-                      onPressed: fillWithAI, // 👈 backend API
-                      icon: const Icon(Icons.auto_awesome),
-                      label: const Text("Auto Fill with AI"),
-                    ),
-                  ),
-
                   const SizedBox(height: 10),
-
-                  // ===== INFO TEXT =====
+                  SizedBox(
+                    width: double.infinity,
+                    height: 40,
+                    child: OutlinedButton.icon(
+                      onPressed: () => uploadDocument('tax'),
+                      icon: const Icon(Icons.file_upload_outlined),
+                      label: const Text('Upload Document'),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(
@@ -2455,18 +2156,14 @@ class _ServiceActionPageState extends State<ServiceActionPage> {
                       vertical: 10,
                     ),
                     decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.surface,
+                      color: Colors.white,
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: Theme.of(
-                          context,
-                        ).dividerColor.withValues(alpha: 0.5),
-                      ),
+                      border: Border.all(color: const Color(0xFFDCE5F0)),
                     ),
-                    child: Text(
-                      'Upload: PDF, image, or document\nAuto Fill: uses AI to prefill tax form fields',
+                    child: const Text(
+                      'Accepted file: PDF, image, or document upload placeholder',
                       style: TextStyle(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        color: Color(0xFF6F8094),
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                       ),
@@ -2475,20 +2172,78 @@ class _ServiceActionPageState extends State<ServiceActionPage> {
                 ],
               ),
             ),
+
+            const SizedBox(height: 8),
+
+            SizedBox(
+              width: double.infinity,
+              height: 42,
+              child: FilledButton.icon(
+                onPressed: fillWithAI,
+                icon: const Icon(Icons.auto_awesome),
+                label: const Text("Auto Fill with AI"),
+              ),
+            ),
+
+            const SizedBox(height: 10),
+
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFDCE5F0)),
+              ),
+              child: const Text(
+                'Upload: PDF, image, or document\nAuto Fill: uses AI to prefill tax form fields',
+                style: TextStyle(
+                  color: Color(0xFF6F8094),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+
+            _buildAiOcrSummaryCard(),
+
             const SizedBox(height: 12),
+
+            const Text(
+              '0. Applicant Name',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'This is extracted from your IC or profile when available.',
+              style: TextStyle(color: Color(0xFF6F8094), fontSize: 12),
+            ),
+            const SizedBox(height: 8),
+
+            TextFormField(
+              controller: _nameController,
+              decoration: const InputDecoration(
+                labelText: 'Full Name',
+                border: OutlineInputBorder(),
+              ),
+              validator: (value) => (value == null || value.trim().isEmpty)
+                  ? 'Name is required'
+                  : null,
+            ),
+
+            const SizedBox(height: 12),
+
             const Text(
               '1. Tax Identification Number (TIN)',
               style: TextStyle(fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 4),
-            Text(
+            const Text(
               'Your personal tax number (e.g. SGXXXXXXXX / OGXXXXXXXX).',
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-                fontSize: 12,
-              ),
+              style: TextStyle(color: Color(0xFF6F8094), fontSize: 12),
             ),
             const SizedBox(height: 8),
+
             TextFormField(
               controller: _tinController,
               decoration: const InputDecoration(
@@ -2499,20 +2254,20 @@ class _ServiceActionPageState extends State<ServiceActionPage> {
                   ? 'TIN is required'
                   : null,
             ),
+
             const SizedBox(height: 12),
+
             const Text(
               '2. Identification Number',
               style: TextStyle(fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 4),
-            Text(
+            const Text(
               'Use IC (MyKad) for Malaysians or Passport for foreigners.',
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-                fontSize: 12,
-              ),
+              style: TextStyle(color: Color(0xFF6F8094), fontSize: 12),
             ),
             const SizedBox(height: 8),
+
             TextFormField(
               controller: _idController,
               decoration: const InputDecoration(
@@ -2523,12 +2278,48 @@ class _ServiceActionPageState extends State<ServiceActionPage> {
                   ? 'Identification number is required'
                   : null,
             ),
+
             const SizedBox(height: 12),
+
+            const Text(
+              '2a. Applicant Address',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 8),
+
+            TextFormField(
+              controller: _addressController,
+              maxLines: 2,
+              decoration: const InputDecoration(
+                labelText: 'Address',
+                border: OutlineInputBorder(),
+              ),
+            ),
+
+            const SizedBox(height: 12),
+
+            const Text(
+              '2b. Date of Birth',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 8),
+
+            TextFormField(
+              controller: _dobController,
+              decoration: const InputDecoration(
+                labelText: 'Date of Birth',
+                border: OutlineInputBorder(),
+              ),
+            ),
+
+            const SizedBox(height: 12),
+
             const Text(
               '3. Type of Tax',
               style: TextStyle(fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 8),
+
             DropdownButtonFormField<String>(
               value: _taxType,
               decoration: const InputDecoration(border: OutlineInputBorder()),
@@ -2550,29 +2341,26 @@ class _ServiceActionPageState extends State<ServiceActionPage> {
                 }
               },
             ),
+
             const SizedBox(height: 12),
+
             const Text(
               '4. Assessment Year (Tahun Taksiran)',
               style: TextStyle(fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 4),
-            Text(
+            const Text(
               'Wrong year can result in incorrect payment records.',
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-                fontSize: 12,
-              ),
+              style: TextStyle(color: Color(0xFF6F8094), fontSize: 12),
             ),
             const SizedBox(height: 8),
+
             DropdownButtonFormField<String>(
               value: _assessmentYear,
               decoration: const InputDecoration(border: OutlineInputBorder()),
               items: years
                   .map(
-                    (year) => DropdownMenuItem<String>(
-                      value: year,
-                      child: Text(year),
-                    ),
+                    (year) => DropdownMenuItem(value: year, child: Text(year)),
                   )
                   .toList(),
               onChanged: (value) {
@@ -2583,20 +2371,20 @@ class _ServiceActionPageState extends State<ServiceActionPage> {
                 }
               },
             ),
+
             const SizedBox(height: 12),
+
             const Text(
               '5. Payment Code',
               style: TextStyle(fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 4),
-            Text(
+            const Text(
               '084 is commonly used for balance of tax payment.',
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-                fontSize: 12,
-              ),
+              style: TextStyle(color: Color(0xFF6F8094), fontSize: 12),
             ),
             const SizedBox(height: 8),
+
             DropdownButtonFormField<String>(
               value: _paymentCode,
               decoration: const InputDecoration(border: OutlineInputBorder()),
@@ -2622,12 +2410,15 @@ class _ServiceActionPageState extends State<ServiceActionPage> {
                 }
               },
             ),
+
             const SizedBox(height: 12),
+
             const Text(
               '6. Amount (RM)',
               style: TextStyle(fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 8),
+
             TextFormField(
               controller: _amountController,
               keyboardType: const TextInputType.numberWithOptions(
@@ -2655,651 +2446,100 @@ class _ServiceActionPageState extends State<ServiceActionPage> {
   }
 }
 
-class _ServiceFormConfig {
-  const _ServiceFormConfig({
-    required this.uploadTitle,
-    required this.uploadHint,
-    required this.suggestedDocuments,
-    required this.sections,
-  });
-
-  final String uploadTitle;
-  final String uploadHint;
-  final List<String> suggestedDocuments;
-  final List<_ServiceFormSection> sections;
-}
-
-class _ServiceFormSection {
-  const _ServiceFormSection({required this.title, required this.rows});
-
-  final String title;
-  final List<List<String>> rows;
-}
-
-const Map<String, _ServiceFormConfig> _serviceFormConfigs = {
-  'MyKad Replacement': _ServiceFormConfig(
-    uploadTitle: 'Upload identity documents',
-    uploadHint:
-        'Upload damaged/lost card report and identity proof for faster verification.',
-    suggestedDocuments: [
-      'Police report (if lost)',
-      'Birth certificate',
-      'Old MyKad photo',
-    ],
-    sections: [
-      _ServiceFormSection(
-        title: '1. Identity Information',
-        rows: [
-          ['Full Name'],
-          ['IC Number (Old / Existing)'],
-          ['Date of Birth', 'Nationality'],
-        ],
-      ),
-      _ServiceFormSection(
-        title: '2. Replacement Details',
-        rows: [
-          ['Reason for Replacement'],
-          ['Preferred JPN Branch'],
-          ['Phone Number', 'Email Address'],
-        ],
-      ),
-    ],
-  ),
-  'Birth Certificate Extract': _ServiceFormConfig(
-    uploadTitle: 'Upload birth record support documents',
-    uploadHint:
-        'Upload IC and related references to speed up extract request review.',
-    suggestedDocuments: [
-      'Applicant IC copy',
-      'Parent/guardian IC copy',
-      'Hospital reference (if any)',
-    ],
-    sections: [
-      _ServiceFormSection(
-        title: '1. Applicant Details',
-        rows: [
-          ['Applicant Full Name'],
-          ['IC Number / Passport'],
-          ['Relationship to Certificate Owner'],
-        ],
-      ),
-      _ServiceFormSection(
-        title: '2. Certificate Details',
-        rows: [
-          ['Name on Birth Certificate'],
-          ['Date of Birth', 'Place of Birth'],
-          ['Reason for Request'],
-        ],
-      ),
-    ],
-  ),
-  'Marriage Registration': _ServiceFormConfig(
-    uploadTitle: 'Upload marriage registration documents',
-    uploadHint:
-        'Upload both applicants documents before selecting appointment slot.',
-    suggestedDocuments: [
-      'Applicant A IC',
-      'Applicant B IC',
-      'Single status confirmation',
-    ],
-    sections: [
-      _ServiceFormSection(
-        title: '1. Applicant A',
-        rows: [
-          ['Full Name'],
-          ['IC Number'],
-          ['Phone Number', 'Email Address'],
-        ],
-      ),
-      _ServiceFormSection(
-        title: '2. Applicant B & Appointment',
-        rows: [
-          ['Applicant B Full Name'],
-          ['Applicant B IC Number'],
-          ['Preferred Date', 'Preferred JPN Branch'],
-        ],
-      ),
-    ],
-  ),
-  'Passport Renewal': _ServiceFormConfig(
-    uploadTitle: 'Upload passport renewal documents',
-    uploadHint:
-        'Upload current passport and photo to pre-check renewal eligibility.',
-    suggestedDocuments: [
-      'Current passport bio page',
-      'Passport photo',
-      'Payment slip (if any)',
-    ],
-    sections: [
-      _ServiceFormSection(
-        title: '1. Passport Holder Information',
-        rows: [
-          ['Full Name'],
-          ['IC Number / Passport Number'],
-          ['Date of Birth', 'Nationality'],
-        ],
-      ),
-      _ServiceFormSection(
-        title: '2. Renewal Preferences',
-        rows: [
-          ['Renewal Duration'],
-          ['Collection Branch'],
-          ['Phone Number', 'Email Address'],
-        ],
-      ),
-    ],
-  ),
-  'Road Tax Renewal': _ServiceFormConfig(
-    uploadTitle: 'Upload vehicle tax documents',
-    uploadHint:
-        'Upload grant/ownership details to prefill vehicle profile (UI only).',
-    suggestedDocuments: [
-      'Vehicle grant copy',
-      'Insurance cover note',
-      'Owner IC copy',
-    ],
-    sections: [
-      _ServiceFormSection(
-        title: '1. Owner & Vehicle',
-        rows: [
-          ['Owner Name'],
-          ['IC Number'],
-          ['Vehicle Plate Number', 'Vehicle Type'],
-        ],
-      ),
-      _ServiceFormSection(
-        title: '2. Renewal & Contact',
-        rows: [
-          ['Renewal Period (months)'],
-          ['Insurance Provider'],
-          ['Phone Number', 'Email Address'],
-        ],
-      ),
-    ],
-  ),
-  'Business Registration': _ServiceFormConfig(
-    uploadTitle: 'Upload business registration documents',
-    uploadHint:
-        'Upload business name proposals and owner details for validation.',
-    suggestedDocuments: [
-      'Owner IC',
-      'Business address proof',
-      'Partnership agreement (if any)',
-    ],
-    sections: [
-      _ServiceFormSection(
-        title: '1. Business Profile',
-        rows: [
-          ['Proposed Business Name'],
-          ['Business Type'],
-          ['Business Address'],
-        ],
-      ),
-      _ServiceFormSection(
-        title: '2. Owner Information',
-        rows: [
-          ['Owner Full Name'],
-          ['Owner IC Number'],
-          ['Phone Number', 'Email Address'],
-        ],
-      ),
-    ],
-  ),
-  'Legal Aid': _ServiceFormConfig(
-    uploadTitle: 'Upload case and support documents',
-    uploadHint:
-        'Upload relevant legal notices and evidence for initial screening.',
-    suggestedDocuments: ['IC copy', 'Case reference documents', 'Income proof'],
-    sections: [
-      _ServiceFormSection(
-        title: '1. Applicant Background',
-        rows: [
-          ['Full Name'],
-          ['IC Number'],
-          ['Monthly Income', 'Employment Status'],
-        ],
-      ),
-      _ServiceFormSection(
-        title: '2. Case Information',
-        rows: [
-          ['Case Type'],
-          ['Case Summary'],
-          ['Preferred Contact Method'],
-        ],
-      ),
-    ],
-  ),
-  'Vehicle Ownership Transfer': _ServiceFormConfig(
-    uploadTitle: 'Upload ownership transfer documents',
-    uploadHint:
-        'Upload seller/buyer documents and grant details for transfer review.',
-    suggestedDocuments: ['Seller IC', 'Buyer IC', 'Vehicle grant copy'],
-    sections: [
-      _ServiceFormSection(
-        title: '1. Seller Information',
-        rows: [
-          ['Seller Name'],
-          ['Seller IC Number'],
-          ['Seller Phone Number'],
-        ],
-      ),
-      _ServiceFormSection(
-        title: '2. Buyer & Vehicle Details',
-        rows: [
-          ['Buyer Name'],
-          ['Buyer IC Number'],
-          ['Vehicle Plate Number', 'Chassis Number'],
-        ],
-      ),
-    ],
-  ),
-  'eKasih Registration': _ServiceFormConfig(
-    uploadTitle: 'Upload household support documents',
-    uploadHint:
-        'Upload income proof and dependants details for aid eligibility checks.',
-    suggestedDocuments: [
-      'Head of household IC',
-      'Salary/income slip',
-      'Utility bill',
-    ],
-    sections: [
-      _ServiceFormSection(
-        title: '1. Household Information',
-        rows: [
-          ['Head of Household Name'],
-          ['IC Number'],
-          ['Home Address'],
-        ],
-      ),
-      _ServiceFormSection(
-        title: '2. Income & Dependants',
-        rows: [
-          ['Monthly Household Income'],
-          ['Number of Dependants'],
-          ['Phone Number', 'Email Address'],
-        ],
-      ),
-    ],
-  ),
-  'Tax Refund Status': _ServiceFormConfig(
-    uploadTitle: 'Upload tax supporting files',
-    uploadHint: 'Upload tax reference if available to verify refund details.',
-    suggestedDocuments: ['IC copy', 'Tax return submission receipt'],
-    sections: [
-      _ServiceFormSection(
-        title: '1. Taxpayer Details',
-        rows: [
-          ['Full Name'],
-          ['Tax Identification Number (TIN)'],
-          ['IC Number / Passport'],
-        ],
-      ),
-      _ServiceFormSection(
-        title: '2. Refund Inquiry',
-        rows: [
-          ['Assessment Year'],
-          ['Bank Account Number (for refund)'],
-          ['Phone Number', 'Email Address'],
-        ],
-      ),
-    ],
-  ),
-  'Zakat Payment': _ServiceFormConfig(
-    uploadTitle: 'Upload zakat payment references',
-    uploadHint:
-        'Upload income or business records to prepare zakat calculation.',
-    suggestedDocuments: [
-      'IC copy',
-      'Income statement',
-      'Business records (if applicable)',
-    ],
-    sections: [
-      _ServiceFormSection(
-        title: '1. Payer Information',
-        rows: [
-          ['Full Name'],
-          ['IC Number'],
-          ['Phone Number', 'Email Address'],
-        ],
-      ),
-      _ServiceFormSection(
-        title: '2. Zakat Details',
-        rows: [
-          ['Zakat Type (income/business/etc.)'],
-          ['Assessment Period'],
-          ['Amount to Pay (RM)'],
-        ],
-      ),
-    ],
-  ),
-  'Public Complaints (SISPAA)': _ServiceFormConfig(
-    uploadTitle: 'Upload complaint evidence',
-    uploadHint:
-        'Upload screenshots/documents to support your complaint submission.',
-    suggestedDocuments: [
-      'Evidence screenshot/photo',
-      'Supporting letter (if any)',
-    ],
-    sections: [
-      _ServiceFormSection(
-        title: '1. Complainant Details',
-        rows: [
-          ['Full Name'],
-          ['IC Number'],
-          ['Phone Number', 'Email Address'],
-        ],
-      ),
-      _ServiceFormSection(
-        title: '2. Complaint Details',
-        rows: [
-          ['Agency Involved'],
-          ['Complaint Category'],
-          ['Complaint Description'],
-        ],
-      ),
-    ],
-  ),
-  'Civil Service Recruitment': _ServiceFormConfig(
-    uploadTitle: 'Upload recruitment documents',
-    uploadHint:
-        'Upload qualifications and resume before filling the application profile.',
-    suggestedDocuments: ['Resume/CV', 'Academic certificate', 'IC copy'],
-    sections: [
-      _ServiceFormSection(
-        title: '1. Candidate Profile',
-        rows: [
-          ['Full Name'],
-          ['IC Number'],
-          ['Date of Birth', 'Nationality'],
-        ],
-      ),
-      _ServiceFormSection(
-        title: '2. Application Details',
-        rows: [
-          ['Position Applied'],
-          ['Highest Education Level'],
-          ['Phone Number', 'Email Address'],
-        ],
-      ),
-    ],
-  ),
-  'Welfare Aid (eBantuan)': _ServiceFormConfig(
-    uploadTitle: 'Upload welfare aid documents',
-    uploadHint:
-        'Upload financial and household proof to support aid application.',
-    suggestedDocuments: [
-      'IC copy',
-      'Income declaration',
-      'Dependants supporting docs',
-    ],
-    sections: [
-      _ServiceFormSection(
-        title: '1. Applicant Information',
-        rows: [
-          ['Full Name'],
-          ['IC Number'],
-          ['Home Address'],
-        ],
-      ),
-      _ServiceFormSection(
-        title: '2. Aid Eligibility Details',
-        rows: [
-          ['Household Income (RM)'],
-          ['Number of Dependants'],
-          ['Phone Number', 'Email Address'],
-        ],
-      ),
-    ],
-  ),
-  'SOCSO Claims': _ServiceFormConfig(
-    uploadTitle: 'Upload SOCSO claim documents',
-    uploadHint: 'Upload incident and employment records for claim processing.',
-    suggestedDocuments: [
-      'IC copy',
-      'Employer letter',
-      'Medical report / incident report',
-    ],
-    sections: [
-      _ServiceFormSection(
-        title: '1. Claimant Information',
-        rows: [
-          ['Full Name'],
-          ['IC Number'],
-          ['SOCSO Member Number'],
-        ],
-      ),
-      _ServiceFormSection(
-        title: '2. Claim Details',
-        rows: [
-          ['Claim Type'],
-          ['Incident Date', 'Incident Location'],
-          ['Phone Number', 'Email Address'],
-        ],
-      ),
-    ],
-  ),
-  'PR1MA Housing': _ServiceFormConfig(
-    uploadTitle: 'Upload PR1MA housing documents',
-    uploadHint:
-        'Upload income and family details to support housing application.',
-    suggestedDocuments: [
-      'IC copy',
-      'Salary slip',
-      'Marriage certificate (if applicable)',
-    ],
-    sections: [
-      _ServiceFormSection(
-        title: '1. Applicant Profile',
-        rows: [
-          ['Full Name'],
-          ['IC Number'],
-          ['Marital Status', 'Household Size'],
-        ],
-      ),
-      _ServiceFormSection(
-        title: '2. Housing Preferences',
-        rows: [
-          ['Preferred Location'],
-          ['Preferred Property Type'],
-          ['Monthly Income', 'Phone Number'],
-        ],
-      ),
-    ],
-  ),
-  'Assessment Tax / Quit Rent': _ServiceFormConfig(
-    uploadTitle: 'Upload property and tax references',
-    uploadHint:
-        'Upload ownership and past bill references for property tax payment.',
-    suggestedDocuments: [
-      'Property ownership document',
-      'Previous bill',
-      'IC copy',
-    ],
-    sections: [
-      _ServiceFormSection(
-        title: '1. Property Owner Information',
-        rows: [
-          ['Owner Full Name'],
-          ['IC Number'],
-          ['Phone Number', 'Email Address'],
-        ],
-      ),
-      _ServiceFormSection(
-        title: '2. Property Tax Details',
-        rows: [
-          ['Property Account Number'],
-          ['Local Council / Authority'],
-          ['Amount to Pay (RM)'],
-        ],
-      ),
-    ],
-  ),
-  'UPU Online': _ServiceFormConfig(
-    uploadTitle: 'Upload academic application documents',
-    uploadHint:
-        'Upload academic certificates and transcripts for UPU application profile.',
-    suggestedDocuments: [
-      'SPM/STPM result slip',
-      'IC copy',
-      'Co-curricular certificates',
-    ],
-    sections: [
-      _ServiceFormSection(
-        title: '1. Student Information',
-        rows: [
-          ['Full Name'],
-          ['IC Number'],
-          ['Phone Number', 'Email Address'],
-        ],
-      ),
-      _ServiceFormSection(
-        title: '2. Admission Preferences',
-        rows: [
-          ['Education Level Applied (Diploma/Degree)'],
-          ['Program Choice 1', 'Program Choice 2'],
-          ['Current Qualification'],
-        ],
-      ),
-    ],
-  ),
-  'Tabung Haji Services': _ServiceFormConfig(
-    uploadTitle: 'Upload Tabung Haji documents',
-    uploadHint:
-        'Upload account references for savings and haj registration services.',
-    suggestedDocuments: [
-      'IC copy',
-      'TH account statement',
-      'Supporting declaration',
-    ],
-    sections: [
-      _ServiceFormSection(
-        title: '1. Account Holder Information',
-        rows: [
-          ['Full Name'],
-          ['IC Number'],
-          ['Tabung Haji Account Number'],
-        ],
-      ),
-      _ServiceFormSection(
-        title: '2. Service Request',
-        rows: [
-          ['Service Type (savings / hajj / transfer)'],
-          ['Amount / Target (if applicable)'],
-          ['Phone Number', 'Email Address'],
-        ],
-      ),
-    ],
-  ),
-  'MyFutureJobs': _ServiceFormConfig(
-    uploadTitle: 'Upload job application documents',
-    uploadHint:
-        'Upload CV and certificates to complete your job-seeker profile.',
-    suggestedDocuments: [
-      'Resume/CV',
-      'Academic certificates',
-      'Professional certificates',
-    ],
-    sections: [
-      _ServiceFormSection(
-        title: '1. Job Seeker Profile',
-        rows: [
-          ['Full Name'],
-          ['IC Number'],
-          ['Phone Number', 'Email Address'],
-        ],
-      ),
-      _ServiceFormSection(
-        title: '2. Employment Details',
-        rows: [
-          ['Preferred Job Role'],
-          ['Industry Preference'],
-          ['Expected Salary (RM)'],
-        ],
-      ),
-    ],
-  ),
-};
-
 class ServiceItem {
   const ServiceItem({
     required this.title,
     required this.subtitle,
     required this.icon,
-    required this.iconBg,
     required this.iconColor,
+    required this.iconBg,
   });
 
   final String title;
   final String subtitle;
   final IconData icon;
-  final Color iconBg;
   final Color iconColor;
+  final Color iconBg;
 }
 
-final List<ServiceItem> _popularItems = [
+const List<ServiceItem> _popularItems = [
   ServiceItem(
     title: 'Tax Filing',
     subtitle: 'LHDN / MyTax',
     icon: Icons.attach_money,
-    iconColor: const Color(0xFF2ECC71),
-    iconBg: const Color(0xFFE8F6EE),
+    iconColor: Color(0xFF2ECC71),
+    iconBg: Color(0xFFE8F6EE),
   ),
   ServiceItem(
     title: 'EPF Management',
     subtitle: 'KWSP',
     icon: Icons.account_balance,
-    iconColor: const Color(0xFF3DA5F5),
-    iconBg: const Color(0xFFE8F4FE),
+    iconColor: Color(0xFF3DA5F5),
+    iconBg: Color(0xFFE8F4FE),
   ),
   ServiceItem(
     title: 'Health Services',
     subtitle: 'KKM',
     icon: Icons.favorite_border,
-    iconColor: const Color(0xFFF5A623),
-    iconBg: const Color(0xFFFFF3E6),
+    iconColor: Color(0xFFF5A623),
+    iconBg: Color(0xFFFFF3E6),
   ),
   ServiceItem(
     title: 'Loan Payment',
     subtitle: 'PTPTN',
     icon: Icons.school_outlined,
-    iconColor: const Color(0xFFE57373),
-    iconBg: const Color(0xFFFDEDEE),
+    iconColor: Color(0xFFE57373),
+    iconBg: Color(0xFFFDEDEE),
   ),
   ServiceItem(
     title: 'License Renewal',
     subtitle: 'JPJ',
     icon: Icons.directions_car_outlined,
-    iconColor: const Color(0xFF607489),
-    iconBg: const Color(0xFFE9EDF2),
+    iconColor: Color(0xFF607489),
+    iconBg: Color(0xFFE9EDF2),
   ),
   ServiceItem(
     title: 'Summons Payment',
     subtitle: 'PDRM',
     icon: Icons.warning_amber_outlined,
-    iconColor: const Color(0xFFF5A623),
-    iconBg: const Color(0xFFFFF3E6),
+    iconColor: Color(0xFFF5A623),
+    iconBg: Color(0xFFFFF3E6),
   ),
 ];
 
-const List<ServiceItem> _governmentServices = [
+const List<ServiceItem> _allItems = [
   ServiceItem(
-    title: 'MyKad Replacement',
+    title: 'Birth Certificate',
     subtitle: 'JPN',
-    icon: Icons.badge_outlined,
+    icon: Icons.description_outlined,
     iconColor: Color(0xFF7D8D9D),
     iconBg: Color(0xFFE9EDF2),
   ),
   ServiceItem(
-    title: 'Birth Certificate Extract',
-    subtitle: 'JPN',
-    icon: Icons.description_outlined,
-    iconColor: const Color(0xFF7D8D9D),
-    iconBg: const Color(0xFFE9EDF2),
+    title: 'Housing Application',
+    subtitle: 'PR1MA',
+    icon: Icons.home_outlined,
+    iconColor: Color(0xFF7D8D9D),
+    iconBg: Color(0xFFE9EDF2),
   ),
   ServiceItem(
-    title: 'Marriage Registration',
-    subtitle: 'JPN',
-    icon: Icons.favorite_border,
+    title: 'Social Welfare',
+    subtitle: 'JKM',
+    icon: Icons.people_outline,
+    iconColor: Color(0xFF7D8D9D),
+    iconBg: Color(0xFFE9EDF2),
+  ),
+  ServiceItem(
+    title: 'Business Registration',
+    subtitle: 'SSM',
+    icon: Icons.work_outline,
+    iconColor: Color(0xFF7D8D9D),
+    iconBg: Color(0xFFE9EDF2),
+  ),
+  ServiceItem(
+    title: 'Legal Aid',
+    subtitle: 'BHEUU',
+    icon: Icons.balance_outlined,
     iconColor: Color(0xFF7D8D9D),
     iconBg: Color(0xFFE9EDF2),
   ),
@@ -3310,137 +2550,7 @@ const List<ServiceItem> _governmentServices = [
     iconColor: Color(0xFF7D8D9D),
     iconBg: Color(0xFFE9EDF2),
   ),
-  ServiceItem(
-    title: 'Road Tax Renewal',
-    subtitle: 'JPJ / MyEG',
-    icon: Icons.directions_car_outlined,
-    iconColor: Color(0xFF7D8D9D),
-    iconBg: Color(0xFFE9EDF2),
-  ),
-  ServiceItem(
-    title: 'Business Registration',
-    subtitle: 'SSM',
-    icon: Icons.business_center_outlined,
-    iconColor: Color(0xFF7D8D9D),
-    iconBg: Color(0xFFE9EDF2),
-  ),
-  ServiceItem(
-    title: 'Legal Aid',
-    subtitle: 'BHEUU',
-    icon: Icons.balance_outlined,
-    iconColor: const Color(0xFF7D8D9D),
-    iconBg: const Color(0xFFE9EDF2),
-  ),
-  ServiceItem(
-    title: 'Vehicle Ownership Transfer',
-    subtitle: 'JPJ',
-    icon: Icons.swap_horiz_outlined,
-    iconColor: Color(0xFF7D8D9D),
-    iconBg: Color(0xFFE9EDF2),
-  ),
-  ServiceItem(
-    title: 'eKasih Registration',
-    subtitle: 'ICU JPM',
-    icon: Icons.assignment_ind_outlined,
-    iconColor: Color(0xFF7D8D9D),
-    iconBg: Color(0xFFE9EDF2),
-  ),
-  ServiceItem(
-    title: 'Tax Refund Status',
-    subtitle: 'LHDN / MyTax',
-    icon: Icons.receipt_long_outlined,
-    iconColor: Color(0xFF7D8D9D),
-    iconBg: Color(0xFFE9EDF2),
-  ),
-  ServiceItem(
-    title: 'Zakat Payment',
-    subtitle: 'Pusat Pungutan Zakat',
-    icon: Icons.volunteer_activism_outlined,
-    iconColor: Color(0xFF7D8D9D),
-    iconBg: Color(0xFFE9EDF2),
-  ),
-  ServiceItem(
-    title: 'Public Complaints (SISPAA)',
-    subtitle: 'SISPAA',
-    icon: Icons.campaign_outlined,
-    iconColor: Color(0xFF7D8D9D),
-    iconBg: Color(0xFFE9EDF2),
-  ),
-  ServiceItem(
-    title: 'Civil Service Recruitment',
-    subtitle: 'SPA9',
-    icon: Icons.badge_outlined,
-    iconColor: Color(0xFF7D8D9D),
-    iconBg: Color(0xFFE9EDF2),
-  ),
-  ServiceItem(
-    title: 'Welfare Aid (eBantuan)',
-    subtitle: 'JKM',
-    icon: Icons.people_outline,
-    iconColor: Color(0xFF7D8D9D),
-    iconBg: Color(0xFFE9EDF2),
-  ),
-  ServiceItem(
-    title: 'SOCSO Claims',
-    subtitle: 'PERKESO',
-    icon: Icons.shield_outlined,
-    iconColor: Color(0xFF7D8D9D),
-    iconBg: Color(0xFFE9EDF2),
-  ),
-  ServiceItem(
-    title: 'PR1MA Housing',
-    subtitle: 'PR1MA',
-    icon: Icons.home_outlined,
-    iconColor: Color(0xFF7D8D9D),
-    iconBg: Color(0xFFE9EDF2),
-  ),
-  ServiceItem(
-    title: 'Assessment Tax / Quit Rent',
-    subtitle: 'Local Councils',
-    icon: Icons.payments_outlined,
-    iconColor: Color(0xFF7D8D9D),
-    iconBg: Color(0xFFE9EDF2),
-  ),
-  ServiceItem(
-    title: 'UPU Online',
-    subtitle: 'KPT',
-    icon: Icons.school_outlined,
-    iconColor: Color(0xFF7D8D9D),
-    iconBg: Color(0xFFE9EDF2),
-  ),
-  ServiceItem(
-    title: 'Tabung Haji Services',
-    subtitle: 'THiJARI',
-    icon: Icons.mosque_outlined,
-    iconColor: Color(0xFF7D8D9D),
-    iconBg: Color(0xFFE9EDF2),
-  ),
-  ServiceItem(
-    title: 'MyFutureJobs',
-    subtitle: 'MyFutureJobs',
-    icon: Icons.work_outline,
-    iconColor: Color(0xFF7D8D9D),
-    iconBg: Color(0xFFE9EDF2),
-  ),
 ];
-
-void openServiceActionPage(BuildContext context, String serviceTitle) {
-  final allItems = [..._popularItems, ..._governmentServices];
-  final matchedItems = allItems.where((item) => item.title == serviceTitle);
-  final item = matchedItems.isNotEmpty
-      ? matchedItems.first
-      : ServiceItem(
-          title: serviceTitle,
-          subtitle: 'SmartGOV',
-          icon: Icons.grid_view_outlined,
-          iconColor: const Color(0xFF7D8D9D),
-          iconBg: const Color(0xFFE9EDF2),
-        );
-
-  Navigator.of(
-    context,
-  ).push(MaterialPageRoute(builder: (_) => ServiceActionPage(item: item)));
-}
 
 class _ServiceNavItem {
   const _ServiceNavItem(this.title, this.icon, this.active);
@@ -3449,15 +2559,3 @@ class _ServiceNavItem {
   final IconData icon;
   final bool active;
 }
-
-const Map<String, List<String>> _subServiceMap = {
-  'Tax Filing': [
-    'Check Tax Status',
-    'Auto File Tax',
-    'Tax Return',
-    'Refund Inquiry',
-  ],
-  'EPF Management': ['Check Balance', 'Withdraw EPF'],
-  'License Renewal': ['Renew License', 'Road Tax Renewal'],
-  'Summons Payment': ['Check Summons', 'Pay Traffic Fine'],
-};

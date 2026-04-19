@@ -24,7 +24,17 @@ class PrefillService {
 
     for (final doc in docs) {
       if (doc["type"] == "income" || doc["type"] == "payslip") {
-        total += (doc["amount"] ?? 0).toDouble();
+        final value = doc["amount"];
+        if (value is num) {
+          total += value.toDouble();
+        } else {
+          final parsed = double.tryParse(
+            value?.toString().replaceAll(RegExp(r'[^0-9.]'), '') ?? '',
+          );
+          if (parsed != null) {
+            total += parsed;
+          }
+        }
       }
     }
 

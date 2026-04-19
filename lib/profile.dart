@@ -196,6 +196,7 @@ class _ProfileBody extends StatefulWidget {
 class _ProfileBodyState extends State<_ProfileBody> {
   final repo = ProfileRepository();
   String? _activeUid;
+  List<_StoredDocument> documents = [];
 
   // Controllers for data binding
   final nameController = TextEditingController();
@@ -391,7 +392,7 @@ class _ProfileBodyState extends State<_ProfileBody> {
                     if (selectedCategory == null) return;
 
                     Navigator.of(context).pop();
-                    await uploadDocument(selectedCategory!);
+                    final doc = await uploadDocument('general');
                   },
                   icon: const Icon(Icons.upload_file_outlined),
                   label: const Text('Upload Document'),
@@ -404,7 +405,7 @@ class _ProfileBodyState extends State<_ProfileBody> {
     );
   }
 
-  Future<void> uploadDocument(String type) async {
+  Future<_StoredDocument?> uploadDocument(String type) async {
     try {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
@@ -412,7 +413,7 @@ class _ProfileBodyState extends State<_ProfileBody> {
         withData: true,
       );
 
-      if (result == null || result.files.first.bytes == null) return;
+      if (result == null || result.files.first.bytes == null) return null;
 
       final file = result.files.first;
 
@@ -423,12 +424,10 @@ class _ProfileBodyState extends State<_ProfileBody> {
 
       final request = http.MultipartRequest(
         "POST",
-        Uri.parse("$baseUrl/upload-doc"), // ✅ updated endpoint
+        Uri.parse("$baseUrl/upload-doc"),
       );
 
       request.headers["Authorization"] = "Bearer $token";
-
-      // ✅ ADD TYPE (epf, health, loan, lesen, summons)
       request.fields["type"] = type;
 
       request.files.add(
@@ -438,22 +437,29 @@ class _ProfileBodyState extends State<_ProfileBody> {
       final response = await request.send();
       final responseBody = await response.stream.bytesToString();
 
-      print("UPLOAD STATUS: ${response.statusCode}");
-      print("UPLOAD RESPONSE: $responseBody");
-
       final data = jsonDecode(responseBody);
 
       if (response.statusCode != 200 || data["success"] != true) {
         throw Exception(data["error"] ?? "Upload failed");
       }
 
+      final doc = _StoredDocument(
+        title: file.name,
+        category: type,
+        uploadedDate: DateTime.now().toString(),
+        filePath: data["filePath"],
+      );
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Document uploaded successfully ✅")),
       );
+
+      return doc;
     } catch (e) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text("Upload failed: $e")));
+      return null;
     } finally {
       setState(() => isLoading = false);
     }
@@ -573,17 +579,13 @@ class _ProfileBodyState extends State<_ProfileBody> {
             children: [
               Expanded(
                 child: _DocumentVaultCard(
-                  // Map Firebase list to the format expected by the UI card
-                  documents: _documents
-                      .map(
-                        (d) => _StoredDocument(
-                          title: d['title'] ?? 'Untitled',
-                          category: d['category'] ?? 'Other',
-                          uploadedDate: d['date'] ?? '',
-                        ),
-                      )
-                      .toList(),
+                  documents: documents,
                   onUploadPressed: _showUploadDocumentDialog,
+                  onDocumentAdded: (doc) {
+                    setState(() {
+                      documents.add(doc);
+                    });
+                  },
                 ),
               ),
               const SizedBox(width: 12),
@@ -727,12 +729,15 @@ class _SectionCard extends StatelessWidget {
 
 class _DocumentVaultCard extends StatelessWidget {
   const _DocumentVaultCard({
+    super.key,
     required this.documents,
     required this.onUploadPressed,
+    required this.onDocumentAdded, // ✅ ADD THIS
   });
 
   final List<_StoredDocument> documents;
   final VoidCallback onUploadPressed;
+  final Function(_StoredDocument) onDocumentAdded; // ✅ ADD THIS
 
   @override
   Widget build(BuildContext context) {
@@ -779,15 +784,17 @@ class _UserProfile {
 }
 
 class _StoredDocument {
-  const _StoredDocument({
-    required this.title,
-    required this.category,
-    required this.uploadedDate,
-  });
-
   final String title;
   final String category;
   final String uploadedDate;
+  final String? filePath; // ✅ added only
+
+  _StoredDocument({
+    required this.title,
+    required this.category,
+    required this.uploadedDate,
+    this.filePath,
+  });
 }
 
 class _SimpleListTile extends StatelessWidget {

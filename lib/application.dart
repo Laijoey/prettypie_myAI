@@ -1,5 +1,10 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+
 import 'chat_assistant_fab.dart';
+import 'services/ai_service.dart';
+import 'services/prefill_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 class ApplicationPage extends StatelessWidget {
@@ -460,30 +465,266 @@ class _ApplicationRow extends StatelessWidget {
   }
 }
 
-class _SuggestionGrid extends StatelessWidget {
+class _SuggestionGrid extends StatefulWidget {
   const _SuggestionGrid();
 
   @override
+  State<_SuggestionGrid> createState() => _SuggestionGridState();
+}
+
+class _SuggestionGridState extends State<_SuggestionGrid> {
+  bool _loading = true;
+  String? _error;
+  List<AiRecommendation> _recommendations = const [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRecommendations();
+  }
+
+  int? _parseAge(dynamic value) {
+    if (value is num) {
+      return value.round();
+    }
+    return int.tryParse(value?.toString() ?? '');
+  }
+
+  int? _ageFromDob(dynamic value) {
+    final dobText = value?.toString();
+    if (dobText == null || dobText.isEmpty) {
+      return null;
+    }
+
+    final parsed = DateTime.tryParse(dobText);
+    if (parsed == null) {
+      return null;
+    }
+
+    final today = DateTime.now();
+    var age = today.year - parsed.year;
+    final hadBirthdayThisYear =
+        today.month > parsed.month ||
+        (today.month == parsed.month && today.day >= parsed.day);
+    if (!hadBirthdayThisYear) {
+      age -= 1;
+    }
+    return age;
+  }
+
+  int _parseIncome(dynamic value) {
+    if (value is num) {
+      return value.round();
+    }
+
+    final text = value?.toString().replaceAll(RegExp(r'[^0-9.]'), '');
+    if (text == null || text.isEmpty) {
+      return 0;
+    }
+
+    return double.tryParse(text)?.round() ?? 0;
+  }
+
+  Future<void> _loadRecommendations() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        setState(() {
+          _error = 'Please sign in to see recommendations.';
+          _loading = false;
+        });
+        return;
+      }
+
+      final profileDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+      final profile = profileDoc.data() ?? const {};
+
+      final documentsSnapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('documents')
+          .get();
+
+      final documents = documentsSnapshot.docs
+          .map((doc) => doc.data())
+          .toList();
+      final prefill = PrefillService.buildPrefill(
+        profile: profile,
+        documents: documents,
+      );
+
+      final income = _parseIncome(prefill['income']) != 0
+          ? _parseIncome(prefill['income'])
+          : _parseIncome(profile['income']);
+      final age = _parseAge(profile['age']) ?? _ageFromDob(profile['dob']) ?? 0;
+      final employmentStatus =
+          (profile['employment_status'] ??
+                  profile['employmentStatus'] ??
+                  'unknown')
+              .toString();
+      final hasVehicle =
+          (profile['has_vehicle'] ?? profile['hasVehicle'] ?? false) == true;
+
+      final recommendations = await AiService.instance.recommend(
+        income: income,
+        age: age,
+        hasVehicle: hasVehicle,
+        employmentStatus: employmentStatus,
+      );
+
+      AiDraftStore.instance.lastRecommendations = recommendations;
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _recommendations = recommendations;
+        _loading = false;
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _error = error.toString();
+        _loading = false;
+      });
+    }
+  }
+
+  void _openService(String route) {
+    if (route.startsWith('/services')) {
+      Navigator.of(context).pushReplacementNamed('/services');
+      return;
+    }
+
+    Navigator.of(context).pushReplacementNamed(route);
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return GridView.count(
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_error != null || _recommendations.isEmpty) {
+      return GridView.count(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        crossAxisCount: 2,
+        crossAxisSpacing: 10,
+        mainAxisSpacing: 10,
+        childAspectRatio: 1.5,
+        children: const [
+          _SuggestionTile(
+            title: 'You are eligible for STR',
+            subtitle:
+                'Based on your income data, you qualify for Sumbangan Tunai Rahmah.',
+            imageAsset: 'assets/images/STR.webp',
+          ),
+          _SuggestionTile(
+            title: 'Apply for MyKasih',
+            subtitle:
+                'Your household profile matches the MyKasih food aid criteria.',
+          ),
+        ],
+      );
+    }
+
+    return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      crossAxisCount: 2,
-      crossAxisSpacing: 10,
-      mainAxisSpacing: 10,
-      childAspectRatio: 2.2,
-      children: const [
-        _SuggestionTile(
-          title: 'You are eligible for STR',
-          subtitle:
-              'Based on your income data, you qualify for Sumbangan Tunai Rahmah.',
-          imageAsset: 'assets/images/STR.webp',
-        ),
-        _SuggestionTile(
-          title: 'Apply for MyKasih',
-          subtitle: 'Your household profile matches the MyKasih food aid criteria.',
-        ),
-      ],
+      itemCount: _recommendations.length,
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        crossAxisSpacing: 10,
+        mainAxisSpacing: 10,
+        mainAxisExtent: 126,
+      ),
+      itemBuilder: (context, index) {
+        final recommendation = _recommendations[index];
+        return Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFD9DEE5)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      recommendation.service,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurface,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: recommendation.priority == 'high'
+                          ? const Color(0xFFFDEDEE)
+                          : recommendation.priority == 'medium'
+                          ? const Color(0xFFFFF3E6)
+                          : const Color(0xFFE8F4FE),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      recommendation.priority.toUpperCase(),
+                      style: TextStyle(
+                        color: recommendation.priority == 'high'
+                            ? Colors.red
+                            : recommendation.priority == 'medium'
+                            ? const Color(0xFFF5A623)
+                            : const Color(0xFF3DA5F5),
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                recommendation.reason,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Color(0xFF6F8094),
+                  fontSize: 12,
+                  height: 1.35,
+                ),
+              ),
+              const Spacer(),
+              SizedBox(
+                width: double.infinity,
+                height: 36,
+                child: FilledButton(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFF214B74),
+                  ),
+                  onPressed: () => _openService(recommendation.route),
+                  child: Text('Apply ${recommendation.service}'),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
@@ -519,7 +760,10 @@ class _SuggestionTile extends StatelessWidget {
                 width: double.infinity,
                 child: Image.asset(
                   imageAsset!,
+                  width: double.infinity,
+                  height: 120,
                   fit: BoxFit.cover,
+                  alignment: Alignment.topCenter,
                 ),
               ),
             ),
