@@ -139,7 +139,13 @@ class MyApp extends StatelessWidget {
             '/dashboard': (_) => const DashboardPage(),
             '/services': (_) => const ServicePage(),
             '/applications': (_) => const ApplicationPage(),
-            '/payments': (_) => const PaymentPage(),
+            '/payments': (context) {
+              final arguments = ModalRoute.of(context)?.settings.arguments;
+              final initialBill = arguments is Map
+                  ? Map<String, dynamic>.from(arguments)
+                  : null;
+              return PaymentPage(initialBill: initialBill);
+            },
             '/notifications': (_) => const NotificationPage(),
             '/profile': (_) => const ProfilePage(),
             '/settings': (_) => const SettingsPage(),

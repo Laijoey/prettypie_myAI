@@ -982,6 +982,165 @@ class ServiceActionPageState extends State<ServiceActionPage> {
     return label.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
   }
 
+  void _openPaymentsPage(Map<String, dynamic> bill) {
+    Navigator.of(context).pushNamed('/payments', arguments: bill);
+  }
+
+  Map<String, dynamic> _buildTaxPaymentBill() {
+    return {
+      'title': 'Tax Filing Payment',
+      'subtitle': widget.item.subtitle,
+      'due': 'Due on submission',
+      'amount': _amountController.text.trim(),
+      'agency': widget.item.subtitle.split(' / ').first,
+      'reference': '${_assessmentYear}-${_paymentCode}-${_tinController.text.trim()}',
+    };
+  }
+
+  String _firstMatchingValue(
+    Map<String, String> formData,
+    List<String> keywords,
+  ) {
+    for (final entry in formData.entries) {
+      final key = entry.key.toLowerCase();
+      if (!keywords.any((keyword) => key.contains(keyword.toLowerCase()))) {
+        continue;
+      }
+
+      final value = entry.value.trim();
+      if (value.isNotEmpty) {
+        return value;
+      }
+    }
+
+    return '';
+  }
+
+  Map<String, dynamic> _buildGenericPaymentBill(
+    Map<String, String> formData,
+    _GenericServiceConfig config,
+  ) {
+    final amount = _firstMatchingValue(formData, [
+      'amount',
+      'fee',
+      'payment amount',
+    ]);
+
+    final reference = _firstMatchingValue(formData, [
+      'reference number',
+      'reference',
+      'summons number',
+      'loan number',
+      'vehicle registration number',
+      'case reference number',
+      'payment code',
+      'tin',
+      'tax identification number',
+    ]);
+
+    final due = _firstMatchingValue(formData, [
+      'assessment year',
+      'renewal duration',
+      'expiry date',
+      'payment date',
+    ]);
+
+    return {
+      'title': widget.item.title,
+      'subtitle': widget.item.subtitle,
+      'due': due.isEmpty ? 'Due on submission' : due,
+      'amount': amount.isEmpty ? '0.00' : amount,
+      'agency': widget.item.subtitle.split(' / ').first,
+      'reference': reference.isEmpty
+          ? '${widget.item.title}-${DateTime.now().millisecondsSinceEpoch}'
+          : reference,
+    };
+  }
+
+  String _firstFilledInfoValue(List<String> labels) {
+    for (final label in labels) {
+      final value = _controllerForInfoField(label).text.trim();
+      if (value.isNotEmpty) {
+        return value;
+      }
+    }
+
+    return '';
+  }
+
+  double? _firstValidAmount(List<String> labels) {
+    for (final label in labels) {
+      final rawValue = _controllerForInfoField(label).text.trim();
+      if (rawValue.isEmpty) {
+        continue;
+      }
+
+      final parsed = double.tryParse(rawValue.replaceAll(',', ''));
+      if (parsed != null && parsed > 0) {
+        return parsed;
+      }
+    }
+
+    return null;
+  }
+
+  void _submitPopularPaymentService() {
+    final amount = _isLoanPayment
+        ? _firstValidAmount([
+            'Payment Amount (RM)',
+            'Enter Amount',
+            'Amount to Pay',
+          ])
+        : _isSummonsPayment
+        ? _firstValidAmount([
+            'Payment Amount (auto or editable)',
+            'Amount to Pay',
+            'Enter Amount',
+          ])
+        : _firstValidAmount([
+            'Fee Amount (auto-calculated placeholder)',
+            'Payment Amount (RM)',
+            'Enter Amount',
+          ]);
+
+    if (amount == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please fill the payment amount first.')),
+      );
+      return;
+    }
+
+    final reference = _isLoanPayment
+        ? _firstFilledInfoValue([
+            'Reference Number (auto-generated placeholder)',
+            'PTPTN Loan Number',
+            'Loan Number',
+          ])
+        : _isSummonsPayment
+        ? _firstFilledInfoValue([
+            'Reference Number',
+            'Summons Number',
+            'Vehicle Plate Number',
+          ])
+        : _firstFilledInfoValue([
+            'Reference Number',
+            'Licence Number',
+          ]);
+
+    final bill = {
+      'title': widget.item.title,
+      'subtitle': widget.item.subtitle,
+      'due': 'Due on submission',
+      'amount': amount.toStringAsFixed(2),
+      'agency': widget.item.subtitle.split(' / ').first,
+      'reference': reference.isEmpty
+          ? '${widget.item.title}-${DateTime.now().millisecondsSinceEpoch}'
+          : reference,
+    };
+
+    _openPaymentsPage(bill);
+  }
+
   bool _containsAny(String text, List<String> tokens) {
     final lower = text.toLowerCase();
     for (final token in tokens) {
@@ -1188,12 +1347,17 @@ class ServiceActionPageState extends State<ServiceActionPage> {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Tax details saved. Continue to payment.')),
     );
-    Navigator.of(context).pushNamed('/payments');
+    _openPaymentsPage(_buildTaxPaymentBill());
   }
 
   void _submitCurrentService() {
     if (_isTaxFiling) {
       _submitTaxPayment();
+      return;
+    }
+
+    if (_isLoanPayment || _isSummonsPayment || _isLicenseRenewal) {
+      _submitPopularPaymentService();
       return;
     }
 
@@ -1270,6 +1434,11 @@ class ServiceActionPageState extends State<ServiceActionPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('${widget.item.title} submitted successfully.')),
       );
+
+      if (widget.item.title == 'Land Tax Payment' ||
+          widget.item.title == 'Zakat Payment') {
+        _openPaymentsPage(_buildGenericPaymentBill(formData, config));
+      }
     } catch (e) {
       if (!mounted) {
         return;

@@ -125,8 +125,14 @@ class AiService {
 
   static final AiService instance = AiService._();
 
-  static const String _configuredBaseUrl = String.fromEnvironment(
+  static const String _configuredAiBaseUrl = String.fromEnvironment(
     'AI_API_BASE_URL',
+    defaultValue: '',
+  );
+
+  // Backward-compatible alias for earlier typo in docs/error text.
+  static const String _configuredAlBaseUrl = String.fromEnvironment(
+    'AL_API_BASE_URL',
     defaultValue: '',
   );
 
@@ -142,9 +148,15 @@ class AiService {
 
   List<String> _baseUrlCandidates() {
     final values = <String>[];
-    final configured = _configuredBaseUrl.trim();
-    if (configured.isNotEmpty) {
-      values.add(configured);
+    final configuredAi = _configuredAiBaseUrl.trim();
+    final configuredAl = _configuredAlBaseUrl.trim();
+
+    if (configuredAi.isNotEmpty) {
+      values.add(configuredAi);
+    }
+
+    if (configuredAl.isNotEmpty) {
+      values.add(configuredAl);
     }
 
     if (kIsWeb) {
@@ -163,6 +175,7 @@ class AiService {
       switch (defaultTargetPlatform) {
         case TargetPlatform.android:
           values.add('http://10.0.2.2:5001');
+          values.add('http://10.0.3.2:5001');
           break;
         default:
           break;
@@ -252,7 +265,7 @@ class AiService {
 
     throw Exception(
       'Unable to reach AI service. Checked: ${candidates.join(', ')}. '
-      'Set AI_API_BASE_URL to your running AI server endpoint. '
+      'Set AI_API_BASE_URL (or AL_API_BASE_URL) to your running AI server endpoint. '
       'Last error: ${lastError ?? 'unknown'}',
     );
   }

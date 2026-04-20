@@ -7,7 +7,9 @@ import 'package:http/http.dart' as http;
 import 'package:firebase_auth/firebase_auth.dart';
 
 class PaymentPage extends StatelessWidget {
-  const PaymentPage({super.key});
+  const PaymentPage({super.key, this.initialBill});
+
+  final Map<String, dynamic>? initialBill;
 
   @override
   Widget build(BuildContext context) {
@@ -25,7 +27,7 @@ class PaymentPage extends StatelessWidget {
                 Expanded(
                   child: ColoredBox(
                     color: theme.scaffoldBackgroundColor,
-                    child: const _PaymentBody(),
+                    child: _PaymentBody(initialBill: initialBill),
                   ),
                 ),
               ],
@@ -185,14 +187,18 @@ class _PaymentSidebar extends StatelessWidget {
 }
 
 class _PaymentBody extends StatefulWidget {
-  const _PaymentBody();
+  const _PaymentBody({this.initialBill});
+
+  final Map<String, dynamic>? initialBill;
 
   @override
   State<_PaymentBody> createState() => _PaymentBodyState();
 }
 
 class _PaymentBodyState extends State<_PaymentBody> {
-  final List<Map<String, dynamic>> _bills = [
+  late final List<Map<String, dynamic>> _bills;
+
+  static const List<Map<String, dynamic>> _defaultBills = [
     {
       "title": "Traffic Summons",
       "subtitle": "PDRM",
@@ -224,9 +230,13 @@ class _PaymentBodyState extends State<_PaymentBody> {
   @override
   void initState() {
     super.initState();
-    if (_bills.isNotEmpty) {
-      _selectedBill = _bills.first;
-    }
+
+    _bills = [
+      if (widget.initialBill != null) widget.initialBill!,
+      ..._defaultBills,
+    ];
+
+    _selectedBill = _bills.isNotEmpty ? _bills.first : null;
   }
 
   void _handleBillSelected(Map<String, dynamic> bill) {
@@ -461,18 +471,29 @@ class _MakePaymentCardState extends State<_MakePaymentCard> {
     text: '300.00',
   );
 
+  void _syncBillFields(Map<String, dynamic>? bill) {
+    if (bill == null) {
+      return;
+    }
+
+    _selectedAgency = bill['agency']?.toString() ?? _selectedAgency;
+    _referenceController.text = bill['reference']?.toString() ?? '';
+    _amountController.text = bill['amount']?.toString() ?? '';
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _syncBillFields(widget.selectedBill);
+  }
+
   @override
   void didUpdateWidget(covariant _MakePaymentCard oldWidget) {
     super.didUpdateWidget(oldWidget);
 
-    if (widget.selectedBill != oldWidget.selectedBill &&
-        widget.selectedBill != null) {
-      final bill = widget.selectedBill!;
-
+    if (widget.selectedBill != oldWidget.selectedBill) {
       setState(() {
-        _selectedAgency = bill['agency'];
-        _referenceController.text = bill['reference'];
-        _amountController.text = bill['amount'].toString();
+        _syncBillFields(widget.selectedBill);
       });
     }
   }
@@ -521,6 +542,8 @@ class _MakePaymentCardState extends State<_MakePaymentCard> {
             referenceNo: reference,
             amount: amount!,
             transactionId: txnId,
+            billTitle: widget.selectedBill?['title']?.toString(),
+            dueDate: widget.selectedBill?['due']?.toString(),
           ),
         ),
       );
@@ -747,13 +770,17 @@ class _PaymentMethodPage extends StatefulWidget {
     required this.agency,
     required this.referenceNo,
     required this.amount,
-    required this.transactionId, 
+    required this.transactionId,
+    this.billTitle,
+    this.dueDate,
   });
 
   final String agency;
   final String referenceNo;
   final double amount;
-  final String transactionId; 
+  final String transactionId;
+  final String? billTitle;
+  final String? dueDate;
 
   @override
   State<_PaymentMethodPage> createState() => _PaymentMethodPageState();
@@ -776,24 +803,32 @@ class _PaymentMethodPageState extends State<_PaymentMethodPage> {
         agency: widget.agency,
         referenceNo: widget.referenceNo,
         amount: widget.amount,
+        billTitle: widget.billTitle,
+        dueDate: widget.dueDate,
       );
     } else if (_selectedMethod == 'Debit / Credit Card') {
       nextPage = _CardDetailsPage(
         agency: widget.agency,
         referenceNo: widget.referenceNo,
         amount: widget.amount,
+        billTitle: widget.billTitle,
+        dueDate: widget.dueDate,
       );
     } else if (_selectedMethod == 'E-Wallet') {
       nextPage = _EWalletSelectionPage(
         agency: widget.agency,
         referenceNo: widget.referenceNo,
         amount: widget.amount,
+        billTitle: widget.billTitle,
+        dueDate: widget.dueDate,
       );
     } else {
       nextPage = _DuitNowQrPage(
         agency: widget.agency,
         referenceNo: widget.referenceNo,
         amount: widget.amount,
+        billTitle: widget.billTitle,
+        dueDate: widget.dueDate,
       );
     }
 
@@ -941,11 +976,15 @@ class _FpxBankSelectionPage extends StatefulWidget {
     required this.agency,
     required this.referenceNo,
     required this.amount,
+    this.billTitle,
+    this.dueDate,
   });
 
   final String agency;
   final String referenceNo;
   final double amount;
+  final String? billTitle;
+  final String? dueDate;
 
   @override
   State<_FpxBankSelectionPage> createState() => _FpxBankSelectionPageState();
@@ -984,6 +1023,8 @@ class _FpxBankSelectionPageState extends State<_FpxBankSelectionPage> {
               referenceNo: widget.referenceNo,
               amount: widget.amount,
               methodLabel: 'Online Banking (FPX)',
+              billTitle: widget.billTitle,
+              dueDate: widget.dueDate,
             ),
             const SizedBox(height: 14),
             const Text(
@@ -1049,6 +1090,8 @@ class _FpxBankSelectionPageState extends State<_FpxBankSelectionPage> {
                         referenceNo: widget.referenceNo,
                         amount: widget.amount,
                         paymentMethod: 'FPX - $_selectedBank',
+                        billTitle: widget.billTitle,
+                        dueDate: widget.dueDate,
                       ),
                     ),
                   );
@@ -1071,11 +1114,15 @@ class _CardDetailsPage extends StatefulWidget {
     required this.agency,
     required this.referenceNo,
     required this.amount,
+    this.billTitle,
+    this.dueDate,
   });
 
   final String agency;
   final String referenceNo;
   final double amount;
+  final String? billTitle;
+  final String? dueDate;
 
   @override
   State<_CardDetailsPage> createState() => _CardDetailsPageState();
@@ -1148,6 +1195,8 @@ class _CardDetailsPageState extends State<_CardDetailsPage> {
                         referenceNo: widget.referenceNo,
                         amount: widget.amount,
                         methodLabel: 'Debit / Credit Card',
+                        billTitle: widget.billTitle,
+                        dueDate: widget.dueDate,
                       ),
                       const SizedBox(height: 14),
                       Container(
@@ -1420,6 +1469,8 @@ class _CardDetailsPageState extends State<_CardDetailsPage> {
                           referenceNo: widget.referenceNo,
                           amount: widget.amount,
                           paymentMethod: 'Debit / Credit Card',
+                            billTitle: widget.billTitle,
+                            dueDate: widget.dueDate,
                         ),
                       ),
                     );
@@ -1471,11 +1522,15 @@ class _EWalletSelectionPage extends StatefulWidget {
     required this.agency,
     required this.referenceNo,
     required this.amount,
+    this.billTitle,
+    this.dueDate,
   });
 
   final String agency;
   final String referenceNo;
   final double amount;
+  final String? billTitle;
+  final String? dueDate;
 
   @override
   State<_EWalletSelectionPage> createState() => _EWalletSelectionPageState();
@@ -1512,6 +1567,8 @@ class _EWalletSelectionPageState extends State<_EWalletSelectionPage> {
               referenceNo: widget.referenceNo,
               amount: widget.amount,
               methodLabel: 'E-Wallet',
+              billTitle: widget.billTitle,
+              dueDate: widget.dueDate,
             ),
             const SizedBox(height: 14),
             Expanded(
@@ -1568,6 +1625,8 @@ class _EWalletSelectionPageState extends State<_EWalletSelectionPage> {
                         referenceNo: widget.referenceNo,
                         amount: widget.amount,
                         paymentMethod: 'E-Wallet - $_selectedWallet',
+                        billTitle: widget.billTitle,
+                        dueDate: widget.dueDate,
                       ),
                     ),
                   );
@@ -1590,11 +1649,15 @@ class _DuitNowQrPage extends StatefulWidget {
     required this.agency,
     required this.referenceNo,
     required this.amount,
+    this.billTitle,
+    this.dueDate,
   });
 
   final String agency;
   final String referenceNo;
   final double amount;
+  final String? billTitle;
+  final String? dueDate;
 
   @override
   State<_DuitNowQrPage> createState() => _DuitNowQrPageState();
@@ -1656,6 +1719,8 @@ class _DuitNowQrPageState extends State<_DuitNowQrPage> {
               referenceNo: widget.referenceNo,
               amount: widget.amount,
               methodLabel: 'DuitNow QR',
+              billTitle: widget.billTitle,
+              dueDate: widget.dueDate,
             ),
             const SizedBox(height: 14),
             Expanded(
@@ -1738,6 +1803,8 @@ class _DuitNowQrPageState extends State<_DuitNowQrPage> {
                                     referenceNo: widget.referenceNo,
                                     amount: widget.amount,
                                     paymentMethod: 'DuitNow QR',
+                                    billTitle: widget.billTitle,
+                                    dueDate: widget.dueDate,
                                   ),
                                 ),
                               );
@@ -1764,12 +1831,16 @@ class _PaymentSummaryCard extends StatelessWidget {
     required this.referenceNo,
     required this.amount,
     required this.methodLabel,
+    this.billTitle,
+    this.dueDate,
   });
 
   final String agency;
   final String referenceNo;
   final double amount;
   final String methodLabel;
+  final String? billTitle;
+  final String? dueDate;
 
   @override
   Widget build(BuildContext context) {
@@ -1793,6 +1864,28 @@ class _PaymentSummaryCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 6),
+          if (billTitle != null && billTitle!.isNotEmpty) ...[
+            Text(
+              'Bill: $billTitle',
+              style: const TextStyle(
+                color: Color(0xFF546579),
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 6),
+          ],
+          if (dueDate != null && dueDate!.isNotEmpty) ...[
+            Text(
+              'Due: $dueDate',
+              style: const TextStyle(
+                color: Color(0xFF546579),
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 6),
+          ],
           Text(
             'Reference No.: $referenceNo',
             style: const TextStyle(
@@ -1831,12 +1924,16 @@ class _PaymentConfirmationPage extends StatefulWidget {
     required this.referenceNo,
     required this.amount,
     required this.paymentMethod,
+    this.billTitle,
+    this.dueDate,
   });
 
   final String agency;
   final String referenceNo;
   final double amount;
   final String paymentMethod;
+  final String? billTitle;
+  final String? dueDate;
 
   @override
   State<_PaymentConfirmationPage> createState() =>
@@ -1930,6 +2027,28 @@ class _PaymentConfirmationPageState extends State<_PaymentConfirmationPage> {
                     ),
                   ),
                   const SizedBox(height: 6),
+                  if (widget.billTitle != null && widget.billTitle!.isNotEmpty) ...[
+                    Text(
+                      'Bill: ${widget.billTitle}',
+                      style: const TextStyle(
+                        color: Color(0xFF546579),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                  ],
+                  if (widget.dueDate != null && widget.dueDate!.isNotEmpty) ...[
+                    Text(
+                      'Due: ${widget.dueDate}',
+                      style: const TextStyle(
+                        color: Color(0xFF546579),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                  ],
                   Text(
                     'Reference No.: ${widget.referenceNo}',
                     style: const TextStyle(
