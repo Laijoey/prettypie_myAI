@@ -5,6 +5,7 @@ import 'chat_assistant_fab.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:firebase_auth/firebase_auth.dart';
+import 'services/backend_api.dart';
 
 class PaymentPage extends StatelessWidget {
   const PaymentPage({super.key, this.initialBill});
@@ -564,9 +565,7 @@ class _MakePaymentCardState extends State<_MakePaymentCard> {
     if (user == null) throw Exception("User not logged in");
 
     final token = await user.getIdToken();
-
-    final baseUrl =
-        "https://prettypie-api-661875192859.asia-southeast1.run.app";
+    final baseUrl = BackendApi.baseUrl;
 
     final response = await http.post(
       Uri.parse("$baseUrl/pay"),

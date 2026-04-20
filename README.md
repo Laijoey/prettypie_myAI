@@ -23,7 +23,7 @@ npm run dev:backend
 # AI + Backend
 npm run dev:services
 
-# Flutter app (with local AI URL)
+# Flutter app (with Cloud Run backend + AI URLs)
 npm run dev:flutter
 ```
 
@@ -39,9 +39,80 @@ npm install
 npm run dev
 ```
 
-If the AI service is not running on `http://127.0.0.1:5001`, launch Flutter with `AI_API_BASE_URL` set to the correct endpoint.
+If the AI service URL differs from `https://mygov-ai-947969904935.asia-southeast1.run.app`, launch Flutter with `AI_API_BASE_URL` set to the correct endpoint.
+
+If the backend service URL differs from `https://mygov-backend-947969904935.asia-southeast1.run.app`, launch Flutter with `BACKEND_API_BASE_URL` set to the correct endpoint.
 
 ## Notes
 
-- AI features (`/chat`, `/recommend`, `/ocr`) use the local AI service by default (`127.0.0.1:5001`).
-- Some non-AI backend calls in Flutter are currently hardcoded to Cloud Run URLs, so those continue to hit cloud backend unless you refactor app API base URLs to local backend.
+- AI features (`/chat`, `/recommend`, `/ocr`) use the Cloud Run AI service by default (`https://mygov-ai-947969904935.asia-southeast1.run.app`).
+- Flutter now reads both `AI_API_BASE_URL` and `BACKEND_API_BASE_URL`, so you can point the web app at local services or Cloud Run without changing code.
+
+## Deploy To Google Cloud Run
+
+Prerequisites:
+
+```bash
+gcloud auth login
+gcloud config set project prettypie
+gcloud config set run/region asia-southeast1
+gcloud services enable run.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com
+```
+
+### 1) Deploy backend service
+
+From project root:
+
+```bash
+gcloud run deploy mygov-backend \
+	--source backend \
+	--platform managed \
+	--allow-unauthenticated \
+	--region asia-southeast1 \
+	--project prettypie
+```
+
+### 2) Deploy AI service
+
+Set your Gemini key once, then deploy:
+
+```bash
+gcloud run deploy mygov-ai \
+	--source ai \
+	--platform managed \
+	--allow-unauthenticated \
+	--region asia-southeast1 \
+	--project prettypie \
+	--set-env-vars GEMINI_API_KEY=YOUR_GEMINI_API_KEY
+```
+
+Optional environment variables for AI:
+
+- `GEMINI_MODEL` (default: `googleai/gemini-2.5-flash`)
+- `DOCUMENT_AI_ENDPOINT`
+- `DOCUMENT_AI_BEARER_TOKEN`
+- `VERTEX_SEARCH_ENDPOINT`
+- `VERTEX_SEARCH_BEARER_TOKEN`
+
+### 3) Deploy Flutter web frontend
+
+Build the Flutter web app with both service URLs baked in:
+
+```bash
+flutter build web \
+	--dart-define=AI_API_BASE_URL=https://mygov-ai-947969904935.asia-southeast1.run.app \
+	--dart-define=BACKEND_API_BASE_URL=https://mygov-backend-947969904935.asia-southeast1.run.app
+```
+
+Then deploy the generated `build/web` folder to your preferred Google Cloud hosting option, or serve it from a separate static Cloud Run container if you want everything under Cloud Run.
+
+### 4) Verify services
+
+```bash
+curl https://mygov-backend-947969904935.asia-southeast1.run.app/
+curl https://mygov-ai-947969904935.asia-southeast1.run.app/
+```
+
+The app points non-AI backend calls to:
+
+- `https://mygov-backend-947969904935.asia-southeast1.run.app`

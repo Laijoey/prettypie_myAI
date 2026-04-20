@@ -1,0 +1,15 @@
+.git
+.gitignore
+.vscode
+.dart_tool
+build
+android
+ios
+linux
+macos
+windows
+node_modules
+backend/node_modules
+ai/node_modules
+**/*.log
+firebase.json

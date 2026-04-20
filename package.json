@@ -7,7 +7,7 @@
     "dev:ai": "npm --prefix ai run dev",
     "dev:backend": "npm --prefix backend run dev",
     "dev:services": "concurrently -n ai,backend -c cyan,green \"npm:dev:ai\" \"npm:dev:backend\"",
-    "dev:flutter": "flutter run -d chrome --web-port 5173 --dart-define=AI_API_BASE_URL=http://127.0.0.1:5001",
+    "dev:flutter": "flutter run -d chrome --web-port 5173 --dart-define=AI_API_BASE_URL=https://mygov-ai-947969904935.asia-southeast1.run.app --dart-define=BACKEND_API_BASE_URL=https://mygov-backend-947969904935.asia-southeast1.run.app",
     "dev:all": "concurrently -n services,flutter -c yellow,blue \"npm:dev:services\" \"npm:dev:flutter\"",
     "install:services": "npm --prefix ai install && npm --prefix backend install",
     "start:services": "concurrently -n ai,backend -c cyan,green \"npm:start:ai\" \"npm:start:backend\"",

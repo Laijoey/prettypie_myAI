@@ -1,7 +1,6 @@
 import 'dart:convert';
-
+import 'dart:typed_data';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 class AiDraftStore {
@@ -125,9 +124,12 @@ class AiService {
 
   static final AiService instance = AiService._();
 
+  static const String _defaultAiBaseUrl =
+      'https://mygov-ai-947969904935.asia-southeast1.run.app';
+
   static const String _configuredAiBaseUrl = String.fromEnvironment(
     'AI_API_BASE_URL',
-    defaultValue: '',
+    defaultValue: _defaultAiBaseUrl,
   );
 
   // Backward-compatible alias for earlier typo in docs/error text.
@@ -135,16 +137,6 @@ class AiService {
     'AL_API_BASE_URL',
     defaultValue: '',
   );
-
-  void _addLoopbackCandidates(List<String> values, String scheme) {
-    values.add('$scheme://127.0.0.1:5001');
-    values.add('$scheme://localhost:5001');
-
-    if (scheme != 'http') {
-      values.add('http://127.0.0.1:5001');
-      values.add('http://localhost:5001');
-    }
-  }
 
   List<String> _baseUrlCandidates() {
     final values = <String>[];
@@ -159,29 +151,7 @@ class AiService {
       values.add(configuredAl);
     }
 
-    if (kIsWeb) {
-      final host = Uri.base.host;
-      final scheme = Uri.base.scheme.isEmpty ? 'http' : Uri.base.scheme;
-
-      if (host.isNotEmpty) {
-        values.add('$scheme://$host:5001');
-        if (scheme != 'http') {
-          values.add('http://$host:5001');
-        }
-      }
-
-      _addLoopbackCandidates(values, scheme);
-    } else {
-      switch (defaultTargetPlatform) {
-        case TargetPlatform.android:
-          values.add('http://10.0.2.2:5001');
-          values.add('http://10.0.3.2:5001');
-          break;
-        default:
-          break;
-      }
-      _addLoopbackCandidates(values, 'http');
-    }
+    values.add(_defaultAiBaseUrl);
 
     final deduped = <String>[];
     for (final value in values) {

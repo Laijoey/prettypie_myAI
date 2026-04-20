@@ -9,7 +9,8 @@
             "deviceId": "chrome",
             "toolArgs": ["--web-port", "5173"],
             "args": [
-                "--dart-define=AI_API_BASE_URL=http://127.0.0.1:5001"
+                "--dart-define=AI_API_BASE_URL=https://mygov-ai-947969904935.asia-southeast1.run.app",
+                "--dart-define=BACKEND_API_BASE_URL=https://mygov-backend-947969904935.asia-southeast1.run.app"
             ]
         }
     ]

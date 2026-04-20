@@ -5,6 +5,7 @@ import 'chat_assistant_fab.dart'; // Ensure this import matches your project
 import 'package:http/http.dart' as http;
 import 'package:file_picker/file_picker.dart';
 import 'dart:convert';
+import 'services/backend_api.dart';
 
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
@@ -195,6 +196,10 @@ class _ProfileBody extends StatefulWidget {
 
 class _ProfileBodyState extends State<_ProfileBody> {
   final repo = ProfileRepository();
+  final String baseUrl = const String.fromEnvironment(
+    'BACKEND_API_BASE_URL',
+    defaultValue: 'https://mygov-backend-947969904935.asia-southeast1.run.app',
+  );
   String? _activeUid;
   List<_StoredDocument> documents = [];
 
@@ -211,9 +216,6 @@ class _ProfileBodyState extends State<_ProfileBody> {
   bool kwsp = true;
   bool padu = false;
   List<Map<String, dynamic>> _documents = [];
-
-  final String baseUrl =
-      "https://prettypie-api-661875192859.asia-southeast1.run.app";
 
   @override
   void didChangeDependencies() {

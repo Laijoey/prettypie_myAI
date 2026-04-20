@@ -4,6 +4,7 @@ import '../widgets/ai_recommendation_box.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:firebase_auth/firebase_auth.dart';
+import 'backend_api.dart';
 
 class TaxPage extends StatefulWidget {
   const TaxPage({super.key});
@@ -19,9 +20,6 @@ class _TaxPageState extends State<TaxPage> {
   List<dynamic>? reliefs;
   String? taxStatus;
 
-  final String baseUrl =
-      "https://prettypie-api-661875192859.asia-southeast1.run.app";
-
   Future<void> autoTax() async {
     setState(() {
       isLoading = true;
@@ -33,7 +31,7 @@ class _TaxPageState extends State<TaxPage> {
 
       final response = await http
           .post(
-            Uri.parse("$baseUrl/auto-tax"),
+            Uri.parse("${BackendApi.baseUrl}/auto-tax"),
             headers: {
               "Content-Type": "application/json",
               "Authorization": "Bearer $token",
@@ -70,7 +68,7 @@ class _TaxPageState extends State<TaxPage> {
       final token = await user!.getIdToken();
 
       final res = await http.post(
-        Uri.parse("$baseUrl/submit-tax"),
+        Uri.parse("${BackendApi.baseUrl}/submit-tax"),
         headers: {
         "Content-Type": "application/json",
         "Authorization": "Bearer $token",
