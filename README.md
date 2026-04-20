@@ -2,7 +2,7 @@
 A unified platform that brings multiple government services into one system. Users can perform tasks like renewing driving licenses, paying income tax, and accessing public services without switching between different apps. The goal is to provide a simpler, faster, and more convenient digital experience for citizens.
 
 ## Deployment GCloud Run Link
-https://mygov-frontend-947969904935.asia-southeast1.run.app/
+https://mygov-frontend-947969904935.asia-southeast1.run.app
 
 ## Run Whole App (AI + Backend + Flutter)
 
