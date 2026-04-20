@@ -476,6 +476,7 @@ class ServiceActionPageState extends State<ServiceActionPage> {
   final _summonsNameController = TextEditingController();
   final _summonsIdController = TextEditingController();
   final _summonsPhoneController = TextEditingController();
+  final Map<String, TextEditingController> _infoFieldControllers = {};
 
   AiOcrResult? _latestOcrResult;
   String? _aiNote;
@@ -528,6 +529,11 @@ class ServiceActionPageState extends State<ServiceActionPage> {
     _summonsIdController.dispose();
     _summonsPhoneController.dispose();
 
+    for (final controller in _infoFieldControllers.values) {
+      controller.dispose();
+    }
+    _infoFieldControllers.clear();
+
     super.dispose();
   }
 
@@ -579,6 +585,17 @@ class ServiceActionPageState extends State<ServiceActionPage> {
         final income = _formatAmount(
           ocrResult?.income ?? prefill['income'] ?? profile['income'],
         );
+        final email =
+          ocrResult?.email ?? _safeString(prefill['email'] ?? profile['email']);
+        final gender = ocrResult?.gender ?? _safeString(profile['gender']);
+        final nationality =
+          ocrResult?.nationality ?? _safeString(profile['nationality']);
+        final employer =
+          ocrResult?.employerName ?? _safeString(profile['employer_name']);
+        final taxId =
+          ocrResult?.taxId ?? _safeString(profile['tax_id'] ?? profile['tin']);
+        final documentNumber =
+          ocrResult?.documentNumber ?? _safeString(profile['document_number']);
 
         if (_isTaxFiling) {
           _nameController.text = name;
@@ -620,6 +637,21 @@ class ServiceActionPageState extends State<ServiceActionPage> {
           _summonsIdController.text = ic;
           _summonsPhoneController.text = phone;
         }
+
+        _applyAutoFillToInfoRows(
+          name: name,
+          ic: ic,
+          address: address,
+          dob: dob,
+          phone: phone,
+          email: email,
+          gender: gender,
+          nationality: nationality,
+          employer: employer,
+          income: income,
+          taxId: taxId,
+          documentNumber: documentNumber,
+        );
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -655,6 +687,26 @@ class ServiceActionPageState extends State<ServiceActionPage> {
       }
 
       final file = result.files.first;
+
+      showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const AlertDialog(
+          content: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2.4),
+              ),
+              SizedBox(width: 12),
+              Expanded(child: Text('Uploading document')),
+            ],
+          ),
+        ),
+      );
+
       setState(() => isLoading = true);
 
       final extracted = await AiService.instance.extractDocument(
@@ -724,6 +776,23 @@ class ServiceActionPageState extends State<ServiceActionPage> {
         });
       }
 
+      setState(() {
+        _applyAutoFillToInfoRows(
+          name: _safeString(extracted.fullName),
+          ic: _safeString(extracted.icNumber),
+          address: _safeString(extracted.address),
+          dob: _safeString(extracted.dob),
+          phone: _safeString(extracted.phone),
+          email: _safeString(extracted.email),
+          gender: _safeString(extracted.gender),
+          nationality: _safeString(extracted.nationality),
+          employer: _safeString(extracted.employerName),
+          income: _formatAmount(extracted.income),
+          taxId: _safeString(extracted.taxId),
+          documentNumber: _safeString(extracted.documentNumber),
+        );
+      });
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -738,6 +807,9 @@ class ServiceActionPageState extends State<ServiceActionPage> {
         context,
       ).showSnackBar(SnackBar(content: Text('OCR upload failed: $e')));
     } finally {
+      if (mounted) {
+        Navigator.of(context, rootNavigator: true).pop();
+      }
       if (mounted) {
         setState(() => isLoading = false);
       }
@@ -774,6 +846,143 @@ class ServiceActionPageState extends State<ServiceActionPage> {
 
     final amount = double.tryParse(text);
     return amount == null ? text : amount.toStringAsFixed(0);
+  }
+
+  String _safeString(dynamic value) {
+    if (value == null) {
+      return '';
+    }
+    return value.toString().trim();
+  }
+
+  String _labelKey(String label) {
+    return label.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+  }
+
+  bool _containsAny(String text, List<String> tokens) {
+    final lower = text.toLowerCase();
+    for (final token in tokens) {
+      if (lower.contains(token)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  TextEditingController _controllerForInfoField(String label) {
+    final key = _labelKey(label);
+    return _infoFieldControllers.putIfAbsent(key, TextEditingController.new);
+  }
+
+  String _valueForInfoLabel(String label, Map<String, String> values) {
+    final lower = label.toLowerCase();
+
+    if (_containsAny(lower, ['full name']) ||
+        lower == 'name' ||
+        lower == 'applicant name') {
+      return values['name'] ?? '';
+    }
+
+    if (_containsAny(lower, [
+      'identification',
+      'ic number',
+      'mykad',
+      'passport',
+      'tax id',
+      'tin',
+      'username / id',
+      'mykad number',
+    ])) {
+      if (_containsAny(lower, ['tax id', 'tin'])) {
+        return values['taxId'] ?? values['ic'] ?? '';
+      }
+      return values['ic'] ?? '';
+    }
+
+    if (_containsAny(lower, ['date of birth', 'dob'])) {
+      return values['dob'] ?? '';
+    }
+
+    if (_containsAny(lower, ['gender', 'sex'])) {
+      return values['gender'] ?? '';
+    }
+
+    if (_containsAny(lower, ['nationality'])) {
+      return values['nationality'] ?? '';
+    }
+
+    if (_containsAny(lower, ['phone', 'mobile', 'contact'])) {
+      return values['phone'] ?? '';
+    }
+
+    if (_containsAny(lower, ['email'])) {
+      return values['email'] ?? '';
+    }
+
+    if (_containsAny(lower, ['address'])) {
+      return values['address'] ?? '';
+    }
+
+    if (_containsAny(lower, ['employer', 'company'])) {
+      return values['employer'] ?? '';
+    }
+
+    if (_containsAny(lower, ['salary', 'income', 'amount'])) {
+      return values['income'] ?? '';
+    }
+
+    if (_containsAny(lower, [
+      'document number',
+      'reference number',
+      'summons number',
+      'vehicle plate',
+      'policy number',
+      'loan number',
+      'licence number',
+      'license number',
+      'transaction id',
+    ])) {
+      return values['documentNumber'] ?? '';
+    }
+
+    return '';
+  }
+
+  void _applyAutoFillToInfoRows({
+    required String name,
+    required String ic,
+    required String address,
+    required String dob,
+    required String phone,
+    required String email,
+    required String gender,
+    required String nationality,
+    required String employer,
+    required String income,
+    required String taxId,
+    required String documentNumber,
+  }) {
+    final values = <String, String>{
+      'name': name,
+      'ic': ic,
+      'address': address,
+      'dob': dob,
+      'phone': phone,
+      'email': email,
+      'gender': gender,
+      'nationality': nationality,
+      'employer': employer,
+      'income': income,
+      'taxId': taxId,
+      'documentNumber': documentNumber,
+    };
+
+    for (final entry in _infoFieldControllers.entries) {
+      final value = _valueForInfoLabel(entry.key, values);
+      if (value.isNotEmpty) {
+        entry.value.text = value;
+      }
+    }
   }
 
   Widget _buildAiOcrSummaryCard() {
@@ -1287,17 +1496,36 @@ class ServiceActionPageState extends State<ServiceActionPage> {
   }
 
   Widget _buildInfoField(String label) {
+    final controller = _controllerForInfoField(label);
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
-      child: TextField(
-        decoration: InputDecoration(
-          labelText: label,
-          border: const OutlineInputBorder(),
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 12,
-            vertical: 10,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              color: Color(0xFF607489),
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
           ),
-        ),
+          const SizedBox(height: 6),
+          TextField(
+            controller: controller,
+            maxLines: 1,
+            decoration: InputDecoration(
+              hintText: 'Enter $label',
+              border: const OutlineInputBorder(),
+              isDense: true,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 11,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

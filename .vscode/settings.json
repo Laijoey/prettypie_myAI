@@ -1,3 +1,4 @@
 {
-    "cmake.sourceDirectory": "C:/Users/flore/prettypie_myAI/linux"
+    "cmake.sourceDirectory": "C:/Users/flore/prettypie_myAI/linux",
+    "debug.javascript.autoAttachFilter": "disabled"
 }

@@ -1,8 +1,6 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
-import { ocrFlow } from './flows/ocrFlow.js';
-import { recommendFlow } from './flows/recommendFlow.js';
 
 const app = express();
 app.use(cors());
@@ -27,6 +25,7 @@ app.post('/recommend', async (req, res) => {
   console.log("BODY:", req.body)
   
   try {
+    const { recommendFlow } = await import('./flows/recommendFlow.js');
     const income = Number(req.body.income);
     const age = Number(req.body.age);
     const has_vehicle = Boolean(req.body.has_vehicle);
@@ -45,6 +44,7 @@ app.post('/recommend', async (req, res) => {
 
 app.post('/ocr', async (req, res) => {
   try {
+    const { ocrFlow } = await import('./flows/ocrFlow.js');
     const { imageBase64, mimeType } = req.body;
     if (!imageBase64 || !mimeType) {
       return res.status(400).json({ error: 'imageBase64 and mimeType are required' });

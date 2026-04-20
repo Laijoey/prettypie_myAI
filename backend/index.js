@@ -295,7 +295,27 @@ async function calculateTax(uid) {
 }
 
 // ================= START SERVER (MUST BE LAST) =================
-const PORT = process.env.PORT || 8080;
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Server running on ${PORT}`);
-});
+const DEFAULT_PORT = Number(process.env.PORT) || 8080;
+const MAX_PORT_RETRIES = 10;
+
+function startServer(port, attempt = 0) {
+  const server = app.listen(port, "0.0.0.0", () => {
+    console.log(`Server running on ${port}`);
+  });
+
+  server.on("error", (err) => {
+    if (err && err.code === "EADDRINUSE" && attempt < MAX_PORT_RETRIES) {
+      const nextPort = port + 1;
+      console.warn(
+        `Port ${port} is in use. Retrying on port ${nextPort}...`
+      );
+      setTimeout(() => startServer(nextPort, attempt + 1), 150);
+      return;
+    }
+
+    console.error("Failed to start backend server:", err);
+    process.exitCode = 1;
+  });
+}
+
+startServer(DEFAULT_PORT);
