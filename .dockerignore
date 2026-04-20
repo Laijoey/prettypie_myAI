@@ -1,6 +1,6 @@
 .git
 .gitignore
-.vscode
+.workspace
 .dart_tool
 build
 android

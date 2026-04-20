@@ -109,6 +109,7 @@ Then deploy the generated `build/web` folder to your preferred Google Cloud host
 ### 4) Verify services
 
 ```bash
+curl https://mygov-frontend-947969904935.asia-southeast1.run.app/
 curl https://mygov-backend-947969904935.asia-southeast1.run.app/
 curl https://mygov-ai-947969904935.asia-southeast1.run.app/
 ```
