@@ -9,6 +9,7 @@ import 'package:file_picker/file_picker.dart';
 
 import 'services/ai_service.dart';
 import 'services/prefill_service.dart';
+import 'services/service_search_backend.dart';
 import 'services/service_navigation_intent.dart';
 
 class ServicePage extends StatelessWidget {
@@ -204,6 +205,11 @@ class _ServicesBody extends StatefulWidget {
 
 class _ServicesBodyState extends State<_ServicesBody> {
   String query = '';
+  bool _showAllServices = false;
+  final TextEditingController _searchController = TextEditingController();
+  Timer? _searchDebounce;
+  bool _isSearching = false;
+  ServiceItem? _searchResult;
 
   @override
   void initState() {
@@ -211,6 +217,13 @@ class _ServicesBodyState extends State<_ServicesBody> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _openTargetServiceIfRequested();
     });
+  }
+
+  @override
+  void dispose() {
+    _searchDebounce?.cancel();
+    _searchController.dispose();
+    super.dispose();
   }
 
   void _openTargetServiceIfRequested() {
@@ -232,18 +245,71 @@ class _ServicesBodyState extends State<_ServicesBody> {
     );
   }
 
+  void _onSearchChanged(String value) {
+    _searchDebounce?.cancel();
+    final normalized = value.trim();
+
+    if (normalized.isEmpty) {
+      setState(() {
+        query = '';
+        _isSearching = false;
+        _searchResult = null;
+      });
+      return;
+    }
+
+    setState(() {
+      query = normalized;
+      _isSearching = true;
+    });
+
+    _searchDebounce = Timer(const Duration(milliseconds: 260), () {
+      _searchSingleService(normalized);
+    });
+  }
+
+  Future<void> _searchSingleService(String value) async {
+    final requestedQuery = value.trim();
+    final mergedItems = [..._popularItems, ..._allItems];
+    final titles = mergedItems.map((item) => item.title).toSet().toList();
+
+    final matchedTitle = await ServiceSearchBackend.searchSingleService(
+      keyword: requestedQuery,
+      serviceTitles: titles,
+    );
+
+    if (!mounted || requestedQuery != query) {
+      return;
+    }
+
+    setState(() {
+      _isSearching = false;
+      _searchResult = matchedTitle == null
+          ? null
+          : mergedItems.firstWhere(
+              (item) => item.title == matchedTitle,
+              orElse: () => mergedItems.first,
+            );
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
+    final visibleAllItems = _showAllServices
+        ? _allItems
+        : _allItems.take(6).toList();
+    final isSearchMode = query.isNotEmpty;
+
     return LayoutBuilder(
       builder: (context, constraints) {
         return SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(20, 14, 18, 14),
           child: ConstrainedBox(
             constraints: BoxConstraints(minHeight: constraints.maxHeight - 28),
-            child: const Column(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
+                const Text(
                   'Government Services',
                   style: TextStyle(
                     color: Color(0xFF1E2D3F),
@@ -251,8 +317,8 @@ class _ServicesBodyState extends State<_ServicesBody> {
                     fontWeight: FontWeight.w700,
                   ),
                 ),
-                SizedBox(height: 6),
-                Text(
+                const SizedBox(height: 6),
+                const Text(
                   'Access all government services in one place',
                   style: TextStyle(
                     color: Color(0xFF6B7B8D),
@@ -260,16 +326,59 @@ class _ServicesBodyState extends State<_ServicesBody> {
                     fontWeight: FontWeight.w500,
                   ),
                 ),
-                SizedBox(height: 16),
-                _SearchServicesField(),
-                SizedBox(height: 20),
-                _ServiceSectionTitle('Popular Services'),
-                SizedBox(height: 10),
-                _ServiceGrid(popular: true),
-                SizedBox(height: 18),
-                _ServiceSectionTitle('All Services'),
-                SizedBox(height: 10),
-                _ServiceGrid(popular: false),
+                const SizedBox(height: 16),
+                _SearchServicesField(
+                  controller: _searchController,
+                  onChanged: _onSearchChanged,
+                ),
+                const SizedBox(height: 20),
+                if (isSearchMode) ...[
+                  const _ServiceSectionTitle('Search Result'),
+                  const SizedBox(height: 10),
+                  if (_isSearching)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 16),
+                      child: Center(
+                        child: CircularProgressIndicator(strokeWidth: 2.2),
+                      ),
+                    )
+                  else if (_searchResult != null)
+                    _ServiceGrid(items: [_searchResult!])
+                  else
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 10),
+                      child: Text(
+                        'No service matched that keyword.',
+                        style: TextStyle(
+                          color: Color(0xFF6B7B8D),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                ] else ...[
+                  const _ServiceSectionTitle('Popular Services'),
+                  const SizedBox(height: 10),
+                  const _ServiceGrid(items: _popularItems, showArrow: true),
+                  const SizedBox(height: 18),
+                  Row(
+                    children: [
+                      const Expanded(child: _ServiceSectionTitle('All Services')),
+                      TextButton(
+                        onPressed: () {
+                          setState(() {
+                            _showAllServices = !_showAllServices;
+                          });
+                        },
+                        child: Text(
+                          _showAllServices ? 'Show less' : 'View all',
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  _ServiceGrid(items: visibleAllItems),
+                ],
               ],
             ),
           ),
@@ -280,11 +389,19 @@ class _ServicesBodyState extends State<_ServicesBody> {
 }
 
 class _SearchServicesField extends StatelessWidget {
-  const _SearchServicesField();
+  const _SearchServicesField({
+    required this.controller,
+    required this.onChanged,
+  });
+
+  final TextEditingController controller;
+  final ValueChanged<String> onChanged;
 
   @override
   Widget build(BuildContext context) {
     return TextField(
+      controller: controller,
+      onChanged: onChanged,
       decoration: InputDecoration(
         isDense: true,
         hintText:
@@ -325,14 +442,13 @@ class _ServiceSectionTitle extends StatelessWidget {
 }
 
 class _ServiceGrid extends StatelessWidget {
-  const _ServiceGrid({required this.popular});
+  const _ServiceGrid({required this.items, this.showArrow = false});
 
-  final bool popular;
+  final List<ServiceItem> items;
+  final bool showArrow;
 
   @override
   Widget build(BuildContext context) {
-    final items = popular ? _popularItems : _allItems;
-
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
@@ -347,7 +463,7 @@ class _ServiceGrid extends StatelessWidget {
         final item = items[index];
         return _ServiceTile(
           item: item,
-          showArrow: popular,
+          showArrow: showArrow,
           onTap: () {
             Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => ServiceActionPage(item: item)),
@@ -490,6 +606,13 @@ class ServiceActionPageState extends State<ServiceActionPage> {
   bool get _isLoanPayment => widget.item.title == 'Loan Payment';
   bool get _isLicenseRenewal => widget.item.title == 'License Renewal';
   bool get _isSummonsPayment => widget.item.title == 'Summons Payment';
+  bool get _isPopularService =>
+      _isTaxFiling ||
+      _isEpfManagement ||
+      _isHealthService ||
+      _isLoanPayment ||
+      _isLicenseRenewal ||
+      _isSummonsPayment;
   bool isLoading = false;
 
   @override
@@ -1068,6 +1191,95 @@ class ServiceActionPageState extends State<ServiceActionPage> {
     Navigator.of(context).pushNamed('/payments');
   }
 
+  void _submitCurrentService() {
+    if (_isTaxFiling) {
+      _submitTaxPayment();
+      return;
+    }
+
+    if (!_isPopularService) {
+      _submitGenericService();
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('${widget.item.title} service started.')),
+    );
+  }
+
+  Future<void> _submitGenericService() async {
+    final config = _genericServiceConfigs[widget.item.title] ??
+        _defaultGenericServiceConfig(widget.item);
+    final missingRequired = <String>[];
+
+    for (final label in config.requiredFields) {
+      final value = _controllerForInfoField(label).text.trim();
+      if (value.isEmpty) {
+        missingRequired.add(label);
+      }
+    }
+
+    if (missingRequired.isNotEmpty) {
+      final preview = missingRequired.take(3).join(', ');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Please fill required fields: $preview')),
+      );
+      return;
+    }
+
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Please sign in first.')));
+      return;
+    }
+
+    final formData = <String, String>{};
+    final seenKeys = <String>{};
+    for (final section in config.sections) {
+      for (final field in section.fields) {
+        final key = _labelKey(field);
+        if (seenKeys.contains(key)) {
+          continue;
+        }
+        seenKeys.add(key);
+        formData[field] = _controllerForInfoField(field).text.trim();
+      }
+    }
+
+    try {
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('service_applications')
+          .add({
+            'service': widget.item.title,
+            'agency': widget.item.subtitle,
+            'fields': formData,
+            'required_fields': config.requiredFields,
+            'ai_extracted': _latestOcrResult?.extracted ?? const {},
+            'created_at': FieldValue.serverTimestamp(),
+            'status': 'submitted',
+          });
+
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${widget.item.title} submitted successfully.')),
+      );
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Submission failed: $e')));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -1169,17 +1381,7 @@ class ServiceActionPageState extends State<ServiceActionPage> {
                     borderRadius: BorderRadius.circular(10),
                   ),
                 ),
-                onPressed: _isTaxFiling
-                    ? _submitTaxPayment
-                    : () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              '${widget.item.title} service started.',
-                            ),
-                          ),
-                        );
-                      },
+                onPressed: _submitCurrentService,
                 child: Text(
                   _isTaxFiling ? 'Pay Tax Now' : 'Proceed',
                   style: const TextStyle(
@@ -1196,6 +1398,9 @@ class ServiceActionPageState extends State<ServiceActionPage> {
   }
 
   Widget _buildGenericForm() {
+    final config = _genericServiceConfigs[widget.item.title] ??
+        _defaultGenericServiceConfig(widget.item);
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(14),
@@ -1204,33 +1409,153 @@ class ServiceActionPageState extends State<ServiceActionPage> {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: const Color(0xFFD9DEE5)),
       ),
-      child: const Column(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Start Service',
-            style: TextStyle(
+            '${widget.item.title} Application',
+            style: const TextStyle(
               color: Color(0xFF1E2D3F),
               fontSize: 16,
               fontWeight: FontWeight.w700,
             ),
           ),
-          SizedBox(height: 10),
-          TextField(
-            decoration: InputDecoration(
-              labelText: 'Identification Number',
-              border: OutlineInputBorder(),
-            ),
+          const SizedBox(height: 8),
+          Text(
+            config.description,
+            style: const TextStyle(color: Color(0xFF6F8094), fontSize: 12),
           ),
-          SizedBox(height: 10),
-          TextField(
-            decoration: InputDecoration(
-              labelText: 'Reference (optional)',
-              border: OutlineInputBorder(),
+          const SizedBox(height: 14),
+          _buildGenericUploadCard(config),
+          const SizedBox(height: 14),
+          for (final section in config.sections)
+            _buildInfoSection(
+              section.title,
+              [
+                for (final field in section.fields) _buildInfoField(field),
+              ],
             ),
-          ),
         ],
       ),
+    );
+  }
+
+  Widget _buildGenericUploadCard(_GenericServiceConfig config) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF5F8FC),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFDCE5F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE8F4FE),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.upload_file_outlined,
+                  color: Color(0xFF3DA5F5),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Upload ${widget.item.title} document',
+                      style: const TextStyle(
+                        color: Color(0xFF1E2D3F),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      config.uploadHint,
+                      style: const TextStyle(
+                        color: Color(0xFF607489),
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            height: 42,
+            child: OutlinedButton.icon(
+              onPressed: () => uploadDocument(config.uploadType),
+              icon: const Icon(Icons.file_upload_outlined),
+              label: const Text('Upload Document'),
+            ),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            height: 42,
+            child: FilledButton.icon(
+              onPressed: fillWithAI,
+              icon: const Icon(Icons.auto_awesome),
+              label: const Text('Auto Fill with AI'),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFFDCE5F0)),
+            ),
+            child: Text(
+              'Accepted files: ${config.acceptedDocs}.',
+              style: const TextStyle(
+                color: Color(0xFF6F8094),
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          _buildAiOcrSummaryCard(),
+        ],
+      ),
+    );
+  }
+
+  _GenericServiceConfig _defaultGenericServiceConfig(ServiceItem item) {
+    return const _GenericServiceConfig(
+      description:
+          'Upload your documents, use AI auto-fill, and complete the required details below.',
+      uploadType: 'general',
+      uploadHint: 'Upload supporting documents relevant to this service.',
+      acceptedDocs: 'PDF, JPG, PNG',
+      requiredFields: ['Full Name', 'IC Number', 'Phone Number'],
+      sections: [
+        _ServiceSectionConfig(
+          title: 'Applicant Information',
+          fields: ['Full Name', 'IC Number', 'Phone Number', 'Email Address'],
+          requiredFields: ['Full Name', 'IC Number', 'Phone Number'],
+        ),
+        _ServiceSectionConfig(
+          title: 'Application Details',
+          fields: ['Reference Number', 'Notes'],
+          requiredFields: ['Reference Number'],
+        ),
+      ],
     );
   }
 
@@ -2830,6 +3155,514 @@ class ServiceActionPageState extends State<ServiceActionPage> {
   }
 }
 
+class _ServiceSectionConfig {
+  const _ServiceSectionConfig({
+    required this.title,
+    required this.fields,
+    this.requiredFields = const [],
+  });
+
+  final String title;
+  final List<String> fields;
+  final List<String> requiredFields;
+}
+
+class _GenericServiceConfig {
+  const _GenericServiceConfig({
+    required this.description,
+    required this.uploadType,
+    required this.uploadHint,
+    required this.acceptedDocs,
+    required this.requiredFields,
+    required this.sections,
+  });
+
+  final String description;
+  final String uploadType;
+  final String uploadHint;
+  final String acceptedDocs;
+  final List<String> requiredFields;
+  final List<_ServiceSectionConfig> sections;
+}
+
+const Map<String, _GenericServiceConfig> _genericServiceConfigs = {
+  'Birth Certificate': _GenericServiceConfig(
+    description:
+        'Request or verify birth certificate records with applicant and child details.',
+    uploadType: 'jpn_birth',
+    uploadHint: 'Upload supporting identity and birth-related documents.',
+    acceptedDocs: 'MyKad, child hospital card, old certificate copy (PDF/JPG/PNG)',
+    requiredFields: [
+      'Applicant Name',
+      'Applicant IC Number',
+      'Child Full Name',
+      'Child Date of Birth',
+    ],
+    sections: [
+      _ServiceSectionConfig(
+        title: 'Applicant Information',
+        fields: [
+          'Applicant Name',
+          'Applicant IC Number',
+          'Phone Number',
+          'Email Address',
+          'Residential Address',
+        ],
+      ),
+      _ServiceSectionConfig(
+        title: 'Child Information',
+        fields: [
+          'Child Full Name',
+          'Child Date of Birth',
+          'Birth Place',
+          'Certificate Number (if reprint)',
+        ],
+      ),
+      _ServiceSectionConfig(
+        title: 'Request Details',
+        fields: ['Request Type', 'Reason for Request', 'Collection Method'],
+      ),
+    ],
+  ),
+  'Housing Application': _GenericServiceConfig(
+    description:
+        'Apply for PR1MA housing by providing household profile, income, and preferred unit.',
+    uploadType: 'pr1ma',
+    uploadHint: 'Upload income and family-supporting documents.',
+    acceptedDocs: 'Pay slip, EPF statement, marriage cert, dependent docs',
+    requiredFields: [
+      'Applicant Name',
+      'Applicant IC Number',
+      'Monthly Household Income (RM)',
+      'Preferred Project / Area',
+    ],
+    sections: [
+      _ServiceSectionConfig(
+        title: 'Applicant Information',
+        fields: [
+          'Applicant Name',
+          'Applicant IC Number',
+          'Phone Number',
+          'Email Address',
+        ],
+      ),
+      _ServiceSectionConfig(
+        title: 'Household Profile',
+        fields: [
+          'Marital Status',
+          'Number of Dependents',
+          'Monthly Household Income (RM)',
+          'Current Address',
+        ],
+      ),
+      _ServiceSectionConfig(
+        title: 'Housing Preferences',
+        fields: [
+          'Preferred Project / Area',
+          'Property Type',
+          'Financing Preference',
+          'Special Notes',
+        ],
+      ),
+    ],
+  ),
+  'Social Welfare': _GenericServiceConfig(
+    description:
+        'Submit welfare aid application with household and financial vulnerability details.',
+    uploadType: 'jkm',
+    uploadHint: 'Upload proof of income and supporting household documents.',
+    acceptedDocs: 'Income proof, OKU card, utility bill, family documents',
+    requiredFields: [
+      'Applicant Name',
+      'Applicant IC Number',
+      'Assistance Type',
+      'Monthly Income (RM)',
+    ],
+    sections: [
+      _ServiceSectionConfig(
+        title: 'Applicant Information',
+        fields: [
+          'Applicant Name',
+          'Applicant IC Number',
+          'Phone Number',
+          'Address',
+        ],
+      ),
+      _ServiceSectionConfig(
+        title: 'Household & Financial Info',
+        fields: [
+          'Number of Dependents',
+          'Monthly Income (RM)',
+          'Employment Status',
+          'Current Hardship Description',
+        ],
+      ),
+      _ServiceSectionConfig(
+        title: 'Aid Request',
+        fields: ['Assistance Type', 'Preferred Channel', 'Bank Account Number'],
+      ),
+    ],
+  ),
+  'Business Registration': _GenericServiceConfig(
+    description:
+        'Register a new business with owner identity, business profile, and compliance details.',
+    uploadType: 'ssm',
+    uploadHint: 'Upload owner identity and supporting business documents.',
+    acceptedDocs: 'MyKad/passport, tenancy agreement, partnership docs',
+    requiredFields: [
+      'Owner Full Name',
+      'Owner IC Number',
+      'Business Name',
+      'Business Type',
+    ],
+    sections: [
+      _ServiceSectionConfig(
+        title: 'Owner Details',
+        fields: [
+          'Owner Full Name',
+          'Owner IC Number',
+          'Phone Number',
+          'Email Address',
+        ],
+      ),
+      _ServiceSectionConfig(
+        title: 'Business Details',
+        fields: [
+          'Business Name',
+          'Business Type',
+          'Business Address',
+          'Business Start Date',
+        ],
+      ),
+      _ServiceSectionConfig(
+        title: 'Compliance Details',
+        fields: [
+          'Capital Amount (RM)',
+          'Shareholders / Partners',
+          'Supporting Notes',
+        ],
+      ),
+    ],
+  ),
+  'Legal Aid': _GenericServiceConfig(
+    description:
+        'Apply for legal aid by describing your case, legal category, and urgency.',
+    uploadType: 'bheuu',
+    uploadHint: 'Upload court letters, notices, or legal evidence files.',
+    acceptedDocs: 'Court notice, police report, supporting legal docs',
+    requiredFields: [
+      'Applicant Full Name',
+      'Applicant IC Number',
+      'Case Category',
+      'Case Summary',
+    ],
+    sections: [
+      _ServiceSectionConfig(
+        title: 'Applicant Information',
+        fields: [
+          'Applicant Full Name',
+          'Applicant IC Number',
+          'Phone Number',
+          'Email Address',
+        ],
+      ),
+      _ServiceSectionConfig(
+        title: 'Case Information',
+        fields: [
+          'Case Category',
+          'Case Summary',
+          'Court Location',
+          'Urgency Level',
+        ],
+      ),
+      _ServiceSectionConfig(
+        title: 'Representation Preference',
+        fields: [
+          'Preferred Consultation Method',
+          'Hearing Date (if any)',
+          'Additional Remarks',
+        ],
+      ),
+    ],
+  ),
+  'Passport Renewal': _GenericServiceConfig(
+    description:
+        'Renew passport by confirming identity, passport details, and delivery preferences.',
+    uploadType: 'jim',
+    uploadHint: 'Upload current passport bio page and photo.',
+    acceptedDocs: 'Current passport copy, photo, supporting travel docs',
+    requiredFields: [
+      'Full Name',
+      'IC Number / Passport Number',
+      'Passport Expiry Date',
+      'Renewal Duration',
+    ],
+    sections: [
+      _ServiceSectionConfig(
+        title: 'Identity Details',
+        fields: [
+          'Full Name',
+          'IC Number / Passport Number',
+          'Date of Birth',
+          'Nationality',
+        ],
+      ),
+      _ServiceSectionConfig(
+        title: 'Passport Details',
+        fields: [
+          'Passport Number',
+          'Passport Expiry Date',
+          'Renewal Duration',
+          'Collection Office',
+        ],
+      ),
+      _ServiceSectionConfig(
+        title: 'Contact & Delivery',
+        fields: ['Phone Number', 'Email Address', 'Delivery Address'],
+      ),
+    ],
+  ),
+  'Marriage Registration': _GenericServiceConfig(
+    description:
+        'Register marriage by submitting bride and groom identity and ceremony details.',
+    uploadType: 'jpn_marriage',
+    uploadHint: 'Upload identification and marriage-supporting documents.',
+    acceptedDocs: 'MyKad/passport, witness details, pre-marriage docs',
+    requiredFields: [
+      'Groom Full Name',
+      'Groom IC Number',
+      'Bride Full Name',
+      'Bride IC Number',
+      'Proposed Marriage Date',
+    ],
+    sections: [
+      _ServiceSectionConfig(
+        title: 'Groom Information',
+        fields: [
+          'Groom Full Name',
+          'Groom IC Number',
+          'Groom Date of Birth',
+          'Groom Address',
+        ],
+      ),
+      _ServiceSectionConfig(
+        title: 'Bride Information',
+        fields: [
+          'Bride Full Name',
+          'Bride IC Number',
+          'Bride Date of Birth',
+          'Bride Address',
+        ],
+      ),
+      _ServiceSectionConfig(
+        title: 'Marriage Details',
+        fields: [
+          'Proposed Marriage Date',
+          'Marriage Venue',
+          'Witness 1 Name',
+          'Witness 2 Name',
+        ],
+      ),
+    ],
+  ),
+  'Land Tax Payment': _GenericServiceConfig(
+    description:
+        'Pay land tax by providing owner details, property references, and payment info.',
+    uploadType: 'ptg',
+    uploadHint: 'Upload land title or tax bill for auto extraction.',
+    acceptedDocs: 'Land title, latest quit-rent bill, owner IC',
+    requiredFields: [
+      'Owner Full Name',
+      'Owner IC Number',
+      'Property Lot Number',
+      'Amount to Pay (RM)',
+    ],
+    sections: [
+      _ServiceSectionConfig(
+        title: 'Owner Information',
+        fields: [
+          'Owner Full Name',
+          'Owner IC Number',
+          'Phone Number',
+          'Email Address',
+        ],
+      ),
+      _ServiceSectionConfig(
+        title: 'Property Information',
+        fields: [
+          'Property Lot Number',
+          'Title Number',
+          'Property Address',
+          'District / State',
+        ],
+      ),
+      _ServiceSectionConfig(
+        title: 'Payment Details',
+        fields: [
+          'Assessment Year',
+          'Amount to Pay (RM)',
+          'Payment Method',
+          'Reference Number',
+        ],
+      ),
+    ],
+  ),
+  'Vehicle Ownership Transfer': _GenericServiceConfig(
+    description:
+        'Transfer vehicle ownership using seller/buyer details and vehicle records.',
+    uploadType: 'jpj_transfer',
+    uploadHint: 'Upload grant copy and transfer authorization documents.',
+    acceptedDocs: 'Geran copy, seller/buyer IC, Puspakom documents',
+    requiredFields: [
+      'Seller Full Name',
+      'Seller IC Number',
+      'Buyer Full Name',
+      'Buyer IC Number',
+      'Vehicle Registration Number',
+    ],
+    sections: [
+      _ServiceSectionConfig(
+        title: 'Seller Information',
+        fields: [
+          'Seller Full Name',
+          'Seller IC Number',
+          'Seller Phone Number',
+          'Seller Address',
+        ],
+      ),
+      _ServiceSectionConfig(
+        title: 'Buyer Information',
+        fields: [
+          'Buyer Full Name',
+          'Buyer IC Number',
+          'Buyer Phone Number',
+          'Buyer Address',
+        ],
+      ),
+      _ServiceSectionConfig(
+        title: 'Vehicle & Transfer Details',
+        fields: [
+          'Vehicle Registration Number',
+          'Vehicle Chassis Number',
+          'Transfer Date',
+          'Transfer Fee (RM)',
+        ],
+      ),
+    ],
+  ),
+  'Court Case Status': _GenericServiceConfig(
+    description:
+        'Check court case status by submitting case reference and litigant details.',
+    uploadType: 'court_case',
+    uploadHint: 'Upload case notice or court reference documents.',
+    acceptedDocs: 'Court notice, case filing papers, legal letters',
+    requiredFields: [
+      'Applicant Full Name',
+      'Applicant IC Number',
+      'Case Reference Number',
+      'Court Name',
+    ],
+    sections: [
+      _ServiceSectionConfig(
+        title: 'Applicant Information',
+        fields: [
+          'Applicant Full Name',
+          'Applicant IC Number',
+          'Phone Number',
+          'Email Address',
+        ],
+      ),
+      _ServiceSectionConfig(
+        title: 'Case Information',
+        fields: [
+          'Case Reference Number',
+          'Court Name',
+          'Case Category',
+          'Hearing Date (if any)',
+        ],
+      ),
+      _ServiceSectionConfig(
+        title: 'Tracking Preference',
+        fields: ['Notification Method', 'Additional Remarks'],
+      ),
+    ],
+  ),
+  'Zakat Payment': _GenericServiceConfig(
+    description:
+        'Calculate and submit zakat payment details with payer profile and declaration.',
+    uploadType: 'zakat',
+    uploadHint: 'Upload income statement or zakat support documents.',
+    acceptedDocs: 'Income statement, zakat worksheet, identification',
+    requiredFields: [
+      'Payer Full Name',
+      'Payer IC Number',
+      'Zakat Type',
+      'Amount to Pay (RM)',
+    ],
+    sections: [
+      _ServiceSectionConfig(
+        title: 'Payer Information',
+        fields: [
+          'Payer Full Name',
+          'Payer IC Number',
+          'Phone Number',
+          'Email Address',
+        ],
+      ),
+      _ServiceSectionConfig(
+        title: 'Zakat Details',
+        fields: [
+          'Zakat Type',
+          'Assessment Year',
+          'Amount to Pay (RM)',
+          'Declaration Notes',
+        ],
+      ),
+      _ServiceSectionConfig(
+        title: 'Payment Channel',
+        fields: ['Payment Method', 'Receipt Delivery Email'],
+      ),
+    ],
+  ),
+  'Public Complaint': _GenericServiceConfig(
+    description:
+        'Submit a public complaint with issue details, location, and supporting evidence.',
+    uploadType: 'sispaa',
+    uploadHint: 'Upload evidence such as photos, letters, or screenshots.',
+    acceptedDocs: 'Photo evidence, documents, screenshots, PDF/JPG/PNG',
+    requiredFields: [
+      'Complainant Name',
+      'Complainant IC Number',
+      'Complaint Category',
+      'Complaint Summary',
+    ],
+    sections: [
+      _ServiceSectionConfig(
+        title: 'Complainant Information',
+        fields: [
+          'Complainant Name',
+          'Complainant IC Number',
+          'Phone Number',
+          'Email Address',
+        ],
+      ),
+      _ServiceSectionConfig(
+        title: 'Complaint Details',
+        fields: [
+          'Complaint Category',
+          'Incident Date',
+          'Incident Location',
+          'Complaint Summary',
+        ],
+      ),
+      _ServiceSectionConfig(
+        title: 'Follow-up',
+        fields: ['Preferred Contact Method', 'Supporting Notes'],
+      ),
+    ],
+  ),
+};
+
 class ServiceItem {
   const ServiceItem({
     required this.title,
@@ -2931,6 +3764,48 @@ const List<ServiceItem> _allItems = [
     title: 'Passport Renewal',
     subtitle: 'JIM',
     icon: Icons.flight_outlined,
+    iconColor: Color(0xFF7D8D9D),
+    iconBg: Color(0xFFE9EDF2),
+  ),
+  ServiceItem(
+    title: 'Marriage Registration',
+    subtitle: 'JPN',
+    icon: Icons.favorite_outline,
+    iconColor: Color(0xFF7D8D9D),
+    iconBg: Color(0xFFE9EDF2),
+  ),
+  ServiceItem(
+    title: 'Land Tax Payment',
+    subtitle: 'PTG',
+    icon: Icons.map_outlined,
+    iconColor: Color(0xFF7D8D9D),
+    iconBg: Color(0xFFE9EDF2),
+  ),
+  ServiceItem(
+    title: 'Vehicle Ownership Transfer',
+    subtitle: 'JPJ',
+    icon: Icons.swap_horiz_outlined,
+    iconColor: Color(0xFF7D8D9D),
+    iconBg: Color(0xFFE9EDF2),
+  ),
+  ServiceItem(
+    title: 'Court Case Status',
+    subtitle: 'e-Kehakiman',
+    icon: Icons.gavel_outlined,
+    iconColor: Color(0xFF7D8D9D),
+    iconBg: Color(0xFFE9EDF2),
+  ),
+  ServiceItem(
+    title: 'Zakat Payment',
+    subtitle: 'PPZ',
+    icon: Icons.volunteer_activism_outlined,
+    iconColor: Color(0xFF7D8D9D),
+    iconBg: Color(0xFFE9EDF2),
+  ),
+  ServiceItem(
+    title: 'Public Complaint',
+    subtitle: 'SISPAA',
+    icon: Icons.campaign_outlined,
     iconColor: Color(0xFF7D8D9D),
     iconBg: Color(0xFFE9EDF2),
   ),

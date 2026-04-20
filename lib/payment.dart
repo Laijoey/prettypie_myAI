@@ -333,7 +333,7 @@ class _OutstandingBillsCard extends StatelessWidget {
               ],
             ),
           ),
-          Divider(height: 1, color: Theme.of(context).dividerColor),
+          Divider(height: 1, color: Color(0xFFF5F5F5)),
           ...bills.map((bill) {
             final isSelected = bill['reference'] == selectedReference;
             return Column(
@@ -347,7 +347,7 @@ class _OutstandingBillsCard extends StatelessWidget {
                   onTap: () => onSelectBill(bill),
                 ),
                 if (bill != bills.last)
-                  Divider(height: 1, color: Theme.of(context).dividerColor),
+                  Divider(height: 1, color: Color(0xFFF5F5F5)),
               ],
             );
           }),

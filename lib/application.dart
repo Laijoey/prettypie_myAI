@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'chat_assistant_fab.dart';
 import 'services/ai_service.dart';
 import 'services/prefill_service.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'services/service_navigation_intent.dart';
 
 class ApplicationPage extends StatelessWidget {
   const ApplicationPage({super.key});
@@ -276,109 +276,201 @@ class _ApplicationBody extends StatelessWidget {
   }
 }
 
-class _ApplicationTrackerCard extends StatelessWidget {
+class _ApplicationTrackerCard extends StatefulWidget {
   const _ApplicationTrackerCard();
 
   @override
-  Widget build(BuildContext context) {
+  State<_ApplicationTrackerCard> createState() => _ApplicationTrackerCardState();
+}
+
+class _ApplicationTrackerCardState extends State<_ApplicationTrackerCard> {
+  List<_TrackedApplication> _buildSampleApplications() {
+    return [
+      _TrackedApplication.sample(
+        id: 'sample-str',
+        title: 'STR Aid Application',
+        agency: 'PADU',
+        status: 'Pending',
+        submittedAt: DateTime(2026, 3, 28),
+        fields: const {
+          'Applicant Name': 'Sample User',
+          'Household Income': 'RM 2,500',
+          'Dependents': '2',
+        },
+      ),
+      _TrackedApplication.sample(
+        id: 'sample-ekasih',
+        title: 'eKasih Registration',
+        agency: 'ICU JPM',
+        status: 'Approved',
+        submittedAt: DateTime(2026, 3, 15),
+        fields: const {
+          'Applicant Name': 'Sample User',
+          'Category': 'B40',
+          'Address': 'Kuala Lumpur',
+        },
+      ),
+      _TrackedApplication.sample(
+        id: 'sample-license',
+        title: 'License Renewal',
+        agency: 'JPJ',
+        status: 'Processing',
+        submittedAt: DateTime(2026, 4, 1),
+        fields: const {
+          'License Class': 'D',
+          'Renewal Duration': '2 years',
+          'Payment Method': 'FPX',
+        },
+      ),
+      _TrackedApplication.sample(
+        id: 'sample-ptptn',
+        title: 'PTPTN Repayment Plan',
+        agency: 'PTPTN',
+        status: 'Rejected',
+        submittedAt: DateTime(2026, 3, 10),
+        fields: const {
+          'Loan Number': 'PTPTN-12345',
+          'Requested Amount': 'RM 180',
+          'Reason': 'Document mismatch',
+        },
+      ),
+    ];
+  }
+
+  _StatusStyle _statusStyle(BuildContext context, String status) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final normalized = status.trim().toLowerCase();
 
-    return Container(
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFD9DEE5)), // kept as-is
+    if (normalized == 'approved') {
+      return _StatusStyle(
+        textColor: Colors.green,
+        bgColor: isDark
+            ? Colors.green.withValues(alpha: 0.15)
+            : const Color(0xFFE4F6EC),
+        icon: Icons.check_circle_outline,
+        iconColor: Colors.green,
+      );
+    }
+
+    if (normalized == 'processing' || normalized == 'in review') {
+      return _StatusStyle(
+        textColor: Colors.blue,
+        bgColor: isDark
+            ? Colors.blue.withValues(alpha: 0.15)
+            : const Color(0xFFE5F4FD),
+        icon: Icons.timelapse,
+        iconColor: Colors.blue,
+      );
+    }
+
+    if (normalized == 'rejected') {
+      return _StatusStyle(
+        textColor: Colors.red,
+        bgColor: isDark ? Colors.red.withValues(alpha: 0.15) : const Color(0xFFFBE9EA),
+        icon: Icons.cancel_outlined,
+        iconColor: Colors.red,
+      );
+    }
+
+    return _StatusStyle(
+      textColor: Colors.orange,
+      bgColor: isDark
+          ? Colors.orange.withValues(alpha: 0.15)
+          : const Color(0xFFFFF1D6),
+      icon: Icons.schedule,
+      iconColor: Colors.orange,
+    );
+  }
+
+  void _openDetails(_TrackedApplication application) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ApplicationDetailsPage(application: application),
       ),
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            child: Row(
-              children: [
-                Text(
-                  'Application Tracker',
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurface,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+    final fallbackItems = _buildSampleApplications();
+
+    Widget buildTracker(List<_TrackedApplication> items) {
+      final rows = items.isEmpty ? fallbackItems : items;
+
+      return Container(
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFD9DEE5)),
+        ),
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              child: Row(
+                children: [
+                  Text(
+                    'Application Tracker',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          Divider(height: 1, color: Theme.of(context).dividerColor),
+            for (int i = 0; i < rows.length; i++) ...[
+              Builder(
+                builder: (context) {
+                  final app = rows[i];
+                  final style = _statusStyle(context, app.status);
+                  return _ApplicationRow(
+                    title: app.title,
+                    subtitle: '${app.agency} • ${_formatDate(app.submittedAt)}',
+                    status: app.status,
+                    statusTextColor: style.textColor,
+                    statusBgColor: style.bgColor,
+                    icon: style.icon,
+                    iconColor: style.iconColor,
+                    iconBgColor: style.bgColor,
+                    onTap: () => _openDetails(app),
+                  );
+                },
+              ),
+            ],
+          ],
+        ),
+      );
+    }
 
-          // ================= PENDING =================
-          _ApplicationRow(
-            title: 'STR Aid Application',
-            subtitle: 'PADU • 28 Mar 2026',
-            status: 'Pending',
-            statusTextColor: Colors.orange,
-            statusBgColor: isDark
-                ? Colors.orange.withValues(alpha: 0.15)
-                : const Color(0xFFFFF1D6),
-            icon: Icons.schedule,
-            iconColor: Colors.orange,
-            iconBgColor: isDark
-                ? Colors.orange.withValues(alpha: 0.15)
-                : const Color(0xFFFFF1D6),
-          ),
+    if (user == null) {
+      return buildTracker(fallbackItems);
+    }
 
-          Divider(height: 1, color: Theme.of(context).dividerColor),
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('service_applications')
+          .orderBy('created_at', descending: true)
+          .limit(20)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return buildTracker(fallbackItems);
+        }
 
-          // ================= APPROVED =================
-          _ApplicationRow(
-            title: 'eKasih Registration',
-            subtitle: 'ICU JPM • 15 Mar 2026',
-            status: 'Approved',
-            statusTextColor: Colors.green,
-            statusBgColor: isDark
-                ? Colors.green.withValues(alpha: 0.15)
-                : const Color(0xFFE4F6EC),
-            icon: Icons.check_circle_outline,
-            iconColor: Colors.green,
-            iconBgColor: isDark
-                ? Colors.green.withValues(alpha: 0.15)
-                : const Color(0xFFE4F6EC),
-          ),
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
 
-          Divider(height: 1, color: Theme.of(context).dividerColor),
-
-          // ================= PROCESSING =================
-          _ApplicationRow(
-            title: 'License Renewal',
-            subtitle: 'JPJ • 1 Apr 2026',
-            status: 'Processing',
-            statusTextColor: Colors.blue,
-            statusBgColor: isDark
-                ? Colors.blue.withValues(alpha: 0.15)
-                : const Color(0xFFE5F4FD),
-            icon: Icons.timelapse,
-            iconColor: Colors.blue,
-            iconBgColor: isDark
-                ? Colors.blue.withValues(alpha: 0.15)
-                : const Color(0xFFE5F4FD),
-          ),
-
-          Divider(height: 1, color: Theme.of(context).dividerColor),
-
-          // ================= REJECTED =================
-          _ApplicationRow(
-            title: 'PTPTN Repayment Plan',
-            subtitle: 'PTPTN • 10 Mar 2026',
-            status: 'Rejected',
-            statusTextColor: Colors.red,
-            statusBgColor: isDark
-                ? Colors.red.withValues(alpha: 0.15)
-                : const Color(0xFFFBE9EA),
-            icon: Icons.cancel_outlined,
-            iconColor: Colors.red,
-            iconBgColor: isDark
-                ? Colors.red.withValues(alpha: 0.15)
-                : const Color(0xFFFBE9EA),
-          ),
-        ],
-      ),
+        final items = snapshot.data!.docs
+            .map(_TrackedApplication.fromFirestore)
+            .toList();
+        return buildTracker(items);
+      },
     );
   }
 }
@@ -393,6 +485,7 @@ class _ApplicationRow extends StatelessWidget {
     required this.icon,
     required this.iconColor,
     required this.iconBgColor,
+    required this.onTap,
   });
 
   final String title;
@@ -403,59 +496,272 @@ class _ApplicationRow extends StatelessWidget {
   final IconData icon;
   final Color iconColor;
   final Color iconBgColor;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Row(
+          children: [
+            Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                color: iconBgColor,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: iconColor, size: 18),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      color: Color(0xFF6F8094),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: statusBgColor,
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                status,
+                style: TextStyle(
+                  color: statusTextColor,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            const Icon(
+              Icons.chevron_right,
+              color: Color(0xFF6F8094),
+              size: 18,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class ApplicationDetailsPage extends StatelessWidget {
+  const ApplicationDetailsPage({super.key, required this.application});
+
+  final _TrackedApplication application;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Application Details'),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surface,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFD9DEE5)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    application.title,
+                    style: TextStyle(
+                      color: theme.colorScheme.onSurface,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Agency: ${application.agency}',
+                    style: const TextStyle(
+                      color: Color(0xFF6F8094),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Submitted: ${_formatDate(application.submittedAt)}',
+                    style: const TextStyle(
+                      color: Color(0xFF6F8094),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE8F4FE),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      application.status,
+                      style: const TextStyle(
+                        color: Color(0xFF214B74),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+            _DetailSection(
+              title: 'Submitted Information',
+              children: application.fields.isEmpty
+                  ? const [
+                      Text(
+                        'No field details were saved for this application.',
+                        style: TextStyle(color: Color(0xFF6F8094), fontSize: 13),
+                      ),
+                    ]
+                  : application.fields.entries
+                        .map(
+                          (entry) => _DetailRow(
+                            label: entry.key,
+                            value: entry.value.isEmpty ? '-' : entry.value,
+                          ),
+                        )
+                        .toList(),
+            ),
+            if (application.aiExtracted.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              _DetailSection(
+                title: 'AI Extracted Fields',
+                children: application.aiExtracted.entries
+                    .map(
+                      (entry) => _DetailRow(
+                        label: entry.key,
+                        value: entry.value,
+                      ),
+                    )
+                    .toList(),
+              ),
+            ],
+            const SizedBox(height: 12),
+            _DetailSection(
+              title: 'Metadata',
+              children: [
+                _DetailRow(label: 'Application ID', value: application.id),
+                _DetailRow(label: 'Source', value: application.source),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DetailSection extends StatelessWidget {
+  const _DetailSection({required this.title, required this.children});
+
+  final String title;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFD9DEE5)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface,
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 8),
+          ...children,
+        ],
+      ),
+    );
+  }
+}
+
+class _DetailRow extends StatelessWidget {
+  const _DetailRow({required this.label, required this.value});
+
+  final String label;
+  final String value;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      padding: const EdgeInsets.only(bottom: 7),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 34,
-            height: 34,
-            decoration: BoxDecoration(
-              color: iconBgColor,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(icon, color: iconColor, size: 18),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurface,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  subtitle,
-                  style: const TextStyle(
-                    color: Color(0xFF6F8094),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: statusBgColor,
-              borderRadius: BorderRadius.circular(999),
-            ),
+          SizedBox(
+            width: 180,
             child: Text(
-              status,
+              label,
+              style: const TextStyle(
+                color: Color(0xFF6F8094),
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
               style: TextStyle(
-                color: statusTextColor,
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
+                color: Theme.of(context).colorScheme.onSurface,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ),
@@ -463,6 +769,125 @@ class _ApplicationRow extends StatelessWidget {
       ),
     );
   }
+}
+
+class _StatusStyle {
+  const _StatusStyle({
+    required this.textColor,
+    required this.bgColor,
+    required this.icon,
+    required this.iconColor,
+  });
+
+  final Color textColor;
+  final Color bgColor;
+  final IconData icon;
+  final Color iconColor;
+}
+
+class _TrackedApplication {
+  const _TrackedApplication({
+    required this.id,
+    required this.title,
+    required this.agency,
+    required this.status,
+    required this.submittedAt,
+    required this.fields,
+    required this.aiExtracted,
+    required this.source,
+  });
+
+  factory _TrackedApplication.fromFirestore(
+    QueryDocumentSnapshot<Map<String, dynamic>> doc,
+  ) {
+    final data = doc.data();
+    final fieldsData = (data['fields'] as Map<String, dynamic>? ?? const {})
+        .map((key, value) => MapEntry(key, value?.toString() ?? ''));
+    final aiData =
+        (data['ai_extracted'] as Map<String, dynamic>? ?? const {})
+            .map((key, value) => MapEntry(key, value?.toString() ?? ''));
+
+    final ts = data['created_at'];
+    final submittedAt = ts is Timestamp ? ts.toDate() : null;
+
+    return _TrackedApplication(
+      id: doc.id,
+      title: (data['service'] ?? 'Application').toString(),
+      agency: (data['agency'] ?? 'Agency').toString(),
+      status: _displayStatus((data['status'] ?? 'Pending').toString()),
+      submittedAt: submittedAt,
+      fields: fieldsData,
+      aiExtracted: aiData,
+      source: 'Firestore',
+    );
+  }
+
+  factory _TrackedApplication.sample({
+    required String id,
+    required String title,
+    required String agency,
+    required String status,
+    required DateTime submittedAt,
+    required Map<String, String> fields,
+  }) {
+    return _TrackedApplication(
+      id: id,
+      title: title,
+      agency: agency,
+      status: status,
+      submittedAt: submittedAt,
+      fields: fields,
+      aiExtracted: const {},
+      source: 'Sample',
+    );
+  }
+
+  final String id;
+  final String title;
+  final String agency;
+  final String status;
+  final DateTime? submittedAt;
+  final Map<String, String> fields;
+  final Map<String, String> aiExtracted;
+  final String source;
+}
+
+String _displayStatus(String raw) {
+  final cleaned = raw.trim();
+  if (cleaned.isEmpty) {
+    return 'Pending';
+  }
+
+  return cleaned
+      .split('_')
+      .join(' ')
+      .split(' ')
+      .where((part) => part.isNotEmpty)
+      .map((part) => '${part[0].toUpperCase()}${part.substring(1).toLowerCase()}')
+      .join(' ');
+}
+
+String _formatDate(DateTime? dateTime) {
+  if (dateTime == null) {
+    return 'Unknown date';
+  }
+
+  const months = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
+
+  return '${dateTime.day} ${months[dateTime.month - 1]} ${dateTime.year}';
 }
 
 class _SuggestionGrid extends StatefulWidget {
@@ -606,6 +1031,11 @@ class _SuggestionGridState extends State<_SuggestionGrid> {
     Navigator.of(context).pushReplacementNamed(route);
   }
 
+  void _openServiceByTitle(String serviceTitle) {
+    ServiceNavigationIntent.targetServiceTitle = serviceTitle;
+    Navigator.of(context).pushReplacementNamed('/services');
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading) {
@@ -613,26 +1043,35 @@ class _SuggestionGridState extends State<_SuggestionGrid> {
     }
 
     if (_error != null || _recommendations.isEmpty) {
-      return GridView.count(
+      return GridView.builder(
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
-        crossAxisCount: 2,
-        crossAxisSpacing: 10,
-        mainAxisSpacing: 10,
-        childAspectRatio: 1.5,
-        children: const [
-          _SuggestionTile(
-            title: 'You are eligible for STR',
-            subtitle:
-                'Based on your income data, you qualify for Sumbangan Tunai Rahmah.',
-            imageAsset: 'assets/images/STR.webp',
-          ),
-          _SuggestionTile(
+        itemCount: 2,
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          crossAxisSpacing: 10,
+          mainAxisSpacing: 10,
+          mainAxisExtent: 300,
+        ),
+        itemBuilder: (context, index) {
+          if (index == 0) {
+            return _SuggestionTile(
+              title: 'You are eligible for STR',
+              subtitle:
+                  'Based on your income data, you qualify for Sumbangan Tunai Rahmah.',
+              imageAsset: 'assets/images/STR.webp',
+              onApply: () => _openServiceByTitle('Social Welfare'),
+            );
+          }
+
+          return _SuggestionTile(
             title: 'Apply for MyKasih',
             subtitle:
                 'Your household profile matches the MyKasih food aid criteria.',
-          ),
-        ],
+            imageAsset: 'assets/images/MYKASIH.webp',
+            onApply: () => _openServiceByTitle('Social Welfare'),
+          );
+        },
       );
     }
 
@@ -734,11 +1173,13 @@ class _SuggestionTile extends StatelessWidget {
     required this.title,
     required this.subtitle,
     this.imageAsset,
+    this.onApply,
   });
 
   final String title;
   final String subtitle;
   final String? imageAsset;
+  final VoidCallback? onApply;
 
   @override
   Widget build(BuildContext context) {
@@ -785,13 +1226,16 @@ class _SuggestionTile extends StatelessWidget {
               height: 1.3,
             ),
           ),
-          const SizedBox(height: 10),
-          const Text(
-            'Apply Now →',
-            style: TextStyle(
-              color: Color(0xFF244A71),
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
+          const Spacer(),
+          InkWell(
+            onTap: onApply,
+            child: const Text(
+              'Apply Now →',
+              style: TextStyle(
+                color: Color(0xFF244A71),
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
         ],
