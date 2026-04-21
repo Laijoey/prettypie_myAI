@@ -41,48 +41,47 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyB3_lNKnI71BMo-eIGYWkF9TZIRu94Esso',
-    appId: '1:661875192859:web:b1aa8529c30490cca5b4be',
-    messagingSenderId: '661875192859',
-    projectId: 'prettypie',
-    authDomain: 'prettypie.firebaseapp.com',
-    storageBucket: 'prettypie.firebasestorage.app',
-    measurementId: 'G-DEW3RJ3353',
+    apiKey: 'AIzaSyBsjGjMKnZ3zDdSFA2ImrvVnnN4qCqRI-4',
+    appId: '1:947969904935:web:f61e7c628511b45a25d902',
+    messagingSenderId: '947969904935',
+    projectId: 'mygov-ai',
+    authDomain: 'mygov-ai.firebaseapp.com',
+    storageBucket: 'mygov-ai.firebasestorage.app',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyDX2uZOQFPLHbVq4ZRmq-JD8y6X2QHAjjw',
-    appId: '1:661875192859:android:4fc1cec8c3c84d27a5b4be',
-    messagingSenderId: '661875192859',
-    projectId: 'prettypie',
-    storageBucket: 'prettypie.firebasestorage.app',
+    apiKey: 'AIzaSyAlKPKwBvGgvy58iaJP9dlRZ6zq6rCw19E',
+    appId: '1:947969904935:android:b5a489c1d406f33725d902',
+    messagingSenderId: '947969904935',
+    projectId: 'mygov-ai',
+    storageBucket: 'mygov-ai.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyA9z4WMDM4wYWIqxzAOsY9VzmIOhe0yIWM',
-    appId: '1:661875192859:ios:f3852c19de17e08da5b4be',
-    messagingSenderId: '661875192859',
-    projectId: 'prettypie',
-    storageBucket: 'prettypie.firebasestorage.app',
+    apiKey: 'AIzaSyC9UwUSI_fQ-_gTayemTlCtShTYtu-IoQo',
+    appId: '1:947969904935:ios:9baba0a4d2d10f7525d902',
+    messagingSenderId: '947969904935',
+    projectId: 'mygov-ai',
+    storageBucket: 'mygov-ai.firebasestorage.app',
     iosBundleId: 'com.example.prettypieMyai',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'AIzaSyA9z4WMDM4wYWIqxzAOsY9VzmIOhe0yIWM',
-    appId: '1:661875192859:ios:f3852c19de17e08da5b4be',
-    messagingSenderId: '661875192859',
-    projectId: 'prettypie',
-    storageBucket: 'prettypie.firebasestorage.app',
+    apiKey: 'AIzaSyC9UwUSI_fQ-_gTayemTlCtShTYtu-IoQo',
+    appId: '1:947969904935:ios:9baba0a4d2d10f7525d902',
+    messagingSenderId: '947969904935',
+    projectId: 'mygov-ai',
+    storageBucket: 'mygov-ai.firebasestorage.app',
     iosBundleId: 'com.example.prettypieMyai',
   );
 
   static const FirebaseOptions windows = FirebaseOptions(
-    apiKey: 'AIzaSyB3_lNKnI71BMo-eIGYWkF9TZIRu94Esso',
-    appId: '1:661875192859:web:544eedb41ba9a750a5b4be',
-    messagingSenderId: '661875192859',
-    projectId: 'prettypie',
-    authDomain: 'prettypie.firebaseapp.com',
-    storageBucket: 'prettypie.firebasestorage.app',
-    measurementId: 'G-G226F4CZS4',
+    apiKey: 'AIzaSyBsjGjMKnZ3zDdSFA2ImrvVnnN4qCqRI-4',
+    appId: '1:947969904935:web:39785f49f86d71a525d902',
+    messagingSenderId: '947969904935',
+    projectId: 'mygov-ai',
+    authDomain: 'mygov-ai.firebaseapp.com',
+    storageBucket: 'mygov-ai.firebasestorage.app',
   );
+
 }

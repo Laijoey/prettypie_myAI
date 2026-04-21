@@ -57,7 +57,7 @@ Prerequisites:
 
 ```bash
 gcloud auth login
-gcloud config set project prettypie
+gcloud config set project mygov-ai
 gcloud config set run/region asia-southeast1
 gcloud services enable run.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com
 ```
@@ -69,10 +69,12 @@ From project root:
 ```bash
 gcloud run deploy mygov-backend \
 	--source backend \
+	--clear-base-image \
 	--platform managed \
 	--allow-unauthenticated \
 	--region asia-southeast1 \
-	--project prettypie
+	--project mygov-ai \
+	--set-env-vars FIREBASE_PROJECT_ID=mygov-ai,FIREBASE_STORAGE_BUCKET=mygov-ai.firebasestorage.app,SEARCH_PROJECT_ID=mygov-ai,SEARCH_LOCATION=global,DATA_STORE_ID=mygov-gcs-connector_1776179121278
 ```
 
 ### 2) Deploy AI service
@@ -82,10 +84,11 @@ Set your Gemini key once, then deploy:
 ```bash
 gcloud run deploy mygov-ai \
 	--source ai \
+	--clear-base-image \
 	--platform managed \
 	--allow-unauthenticated \
 	--region asia-southeast1 \
-	--project prettypie \
+	--project mygov-ai \
 	--set-env-vars GEMINI_API_KEY=YOUR_GEMINI_API_KEY
 ```
 

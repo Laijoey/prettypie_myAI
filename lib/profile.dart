@@ -196,10 +196,7 @@ class _ProfileBody extends StatefulWidget {
 
 class _ProfileBodyState extends State<_ProfileBody> {
   final repo = ProfileRepository();
-  final String baseUrl = const String.fromEnvironment(
-    'BACKEND_API_BASE_URL',
-    defaultValue: 'https://mygov-backend-947969904935.asia-southeast1.run.app',
-  );
+  final String baseUrl = BackendApi.baseUrl;
   String? _activeUid;
   List<_StoredDocument> documents = [];
 

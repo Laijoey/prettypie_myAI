@@ -12,9 +12,19 @@ app.use(express.json());
 
 const admin = require("firebase-admin");
 
+const FIREBASE_PROJECT_ID = process.env.FIREBASE_PROJECT_ID || "mygov-ai";
+const FIREBASE_STORAGE_BUCKET =
+  process.env.FIREBASE_STORAGE_BUCKET || "mygov-ai.firebasestorage.app";
+
+const SEARCH_PROJECT_ID = process.env.SEARCH_PROJECT_ID || "mygov-ai";
+const LOCATION = process.env.SEARCH_LOCATION || "global";
+const DATA_STORE_ID =
+  process.env.DATA_STORE_ID || "mygov-gcs-connector_1776179121278";
+
 admin.initializeApp({
   credential: admin.credential.applicationDefault(),
-  storageBucket: "prettypie.firebasestorage.app" // ✅ ADD THIS
+  projectId: FIREBASE_PROJECT_ID,
+  storageBucket: FIREBASE_STORAGE_BUCKET,
 });
 
 const { genkit } = require("genkit");
@@ -29,17 +39,13 @@ const { SearchServiceClient } = require("@google-cloud/discoveryengine");
 
 const client = new SearchServiceClient();
 
-const PROJECT_ID = "prettypie";
-const LOCATION = "global";
-const DATA_STORE_ID = "prettypie_1776251743848";
-
 const bucket = admin.storage().bucket();
 const db = admin.firestore();
 const multer = require("multer");
 const upload = multer({ storage: multer.memoryStorage() });
 
 async function searchDocs(query) {
-  const servingConfig = `projects/${PROJECT_ID}/locations/${LOCATION}/collections/default_collection/dataStores/${DATA_STORE_ID}/servingConfigs/default_serving_config`;
+  const servingConfig = `projects/${SEARCH_PROJECT_ID}/locations/${LOCATION}/collections/default_collection/dataStores/${DATA_STORE_ID}/servingConfigs/default_serving_config`;
 
   const request = {
     servingConfig,
@@ -65,13 +71,16 @@ async function searchDocs(query) {
 //================= VERIFY USER MIDDLEWARE =================
 async function verifyUser(req, res, next) {
   try {
-    const authHeader = req.headers.authorization;
+    const authHeader = req.headers.authorization || "";
 
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return res.status(401).json({ error: "No token provided" });
     }
 
-    const token = authHeader.split("Bearer ")[1];
+    const token = authHeader.substring("Bearer ".length).trim();
+    if (!token) {
+      return res.status(401).json({ error: "No token provided" });
+    }
 
     const decodedToken = await admin.auth().verifyIdToken(token);
 
@@ -81,6 +90,7 @@ async function verifyUser(req, res, next) {
     return res.status(401).json({
       error: "Invalid token",
       detail: err.message,
+      projectId: FIREBASE_PROJECT_ID,
     });
   }
 }

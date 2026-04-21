@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "661875192859",
-    "project_id": "prettypie",
-    "storage_bucket": "prettypie.firebasestorage.app"
+    "project_number": "947969904935",
+    "project_id": "mygov-ai",
+    "storage_bucket": "mygov-ai.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:661875192859:android:4fc1cec8c3c84d27a5b4be",
+        "mobilesdk_app_id": "1:947969904935:android:b5a489c1d406f33725d902",
         "android_client_info": {
           "package_name": "com.example.prettypie_myai"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyDX2uZOQFPLHbVq4ZRmq-JD8y6X2QHAjjw"
+          "current_key": "AIzaSyAlKPKwBvGgvy58iaJP9dlRZ6zq6rCw19E"
         }
       ],
       "services": {
