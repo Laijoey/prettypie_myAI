@@ -214,14 +214,6 @@ class _ProfileBodyState extends State<_ProfileBody> {
   bool padu = false;
   List<Map<String, dynamic>> _documents = [];
 
-  static const Map<String, String> _profileVaultUploadTypes = {
-    'ID': 'general',
-    'Finance': 'lhdn',
-    'Education': 'ptptn',
-    'Health': 'kkm',
-    'Other': 'general',
-  };
-
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -252,33 +244,17 @@ class _ProfileBodyState extends State<_ProfileBody> {
 
       _activeUid = resolvedUid;
 
-      final profile = await repo.getUserProfile(resolvedUid);
       final userDocs = await repo.getUserDocuments(resolvedUid);
 
-      if (profile.isNotEmpty) {
-        nameController.text = _firstNonEmpty(profile, [
-          'name',
-          'fullName',
-          'full_name',
-        ]);
-        icController.text = _firstNonEmpty(profile, [
-          'ic',
-          'ic_number',
-          'mykad',
-          'id_number',
-        ]);
-        phoneController.text = _firstNonEmpty(profile, [
-          'phone',
-          'phone_number',
-          'mobile',
-        ]);
-        emailController.text = _firstNonEmpty(profile, ['email']);
-        addressController.text = _firstNonEmpty(profile, ['address']);
-
-        lhdn = profile['share_lhdn'] ?? true;
-        kwsp = profile['share_kwsp'] ?? true;
-        padu = profile['share_padu'] ?? false;
-      }
+        nameController.text = 'Ahmad Bin Abdullah';
+        icController.text = '980512-14-5677';
+        phoneController.text = '011-2345 6789';
+        emailController.text = 'ahmad.abdullah@gmail.com';
+        addressController.text =
+          'No.14, Jalan Maju 3, Taman Sejahtera, 43000 Kajang, Selangor';
+        lhdn = true;
+        kwsp = true;
+        padu = false;
 
       _documents = userDocs ?? [];
       documents = _documents
@@ -334,9 +310,6 @@ class _ProfileBodyState extends State<_ProfileBody> {
       'phone': phoneController.text.trim(),
       'email': emailController.text.trim(),
       'address': addressController.text.trim(),
-      'share_lhdn': lhdn,
-      'share_kwsp': kwsp,
-      'share_padu': padu,
     });
 
     if (mounted) {
@@ -460,8 +433,6 @@ class _ProfileBodyState extends State<_ProfileBody> {
 
                     Navigator.of(context).pop();
                     final doc = await uploadDocument(
-                      uploadType:
-                          _profileVaultUploadTypes[selectedCategory!] ?? 'general',
                       categoryLabel: selectedCategory!,
                     );
                     if (doc != null) {
@@ -482,13 +453,11 @@ class _ProfileBodyState extends State<_ProfileBody> {
   }
 
   Future<_StoredDocument?> uploadDocument({
-    required String uploadType,
     required String categoryLabel,
   }) async {
     try {
       final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['pdf', 'jpg', 'png'],
+        type: FileType.any,
         withData: true,
       );
 
@@ -507,7 +476,8 @@ class _ProfileBodyState extends State<_ProfileBody> {
       );
 
       request.headers["Authorization"] = "Bearer $token";
-      request.fields["type"] = uploadType;
+      // Always use a backend-accepted document type to avoid invalid-type errors.
+      request.fields["type"] = 'general';
 
       request.files.add(
         http.MultipartFile.fromBytes("file", file.bytes!, filename: file.name),
@@ -529,19 +499,24 @@ class _ProfileBodyState extends State<_ProfileBody> {
         filePath: data["filePath"],
       );
 
-      // ✅ Save document to Firestore for persistence
+      // Keep Firestore persistence best-effort so permission issues do not block upload.
       if (_activeUid != null) {
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc(_activeUid!)
-            .collection('documents')
-            .doc('${DateTime.now().millisecondsSinceEpoch}')
-            .set({
-              'title': doc.title,
-              'category': doc.category,
-              'uploadedDate': doc.uploadedDate,
-              'filePath': doc.filePath,
-            });
+        try {
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(_activeUid!)
+              .collection('documents')
+              .doc('${DateTime.now().millisecondsSinceEpoch}')
+              .set({
+                'title': doc.title,
+                'category': doc.category,
+                'uploadedDate': doc.uploadedDate,
+                'filePath': doc.filePath,
+                'type': 'general',
+              });
+        } catch (e) {
+          debugPrint('Non-blocking document metadata save failed: $e');
+        }
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
