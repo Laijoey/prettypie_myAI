@@ -722,8 +722,7 @@ class ServiceActionPageState extends State<ServiceActionPage> {
 
         if (_isTaxFiling) {
           _nameController.text = name;
-          _tinController.text = (profile['tin'] ?? profile['tax_id'] ?? '')
-              .toString();
+          _tinController.text = taxId;
           _idController.text = ic;
           _addressController.text = address;
           _dobController.text = dob;
@@ -843,6 +842,7 @@ class ServiceActionPageState extends State<ServiceActionPage> {
       if (_isTaxFiling) {
         setState(() {
           _nameController.text = extracted.fullName ?? _nameController.text;
+          _tinController.text = extracted.taxId ?? _tinController.text;
           _idController.text = extracted.icNumber ?? _idController.text;
           _addressController.text =
               extracted.address ?? _addressController.text;

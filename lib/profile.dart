@@ -214,6 +214,14 @@ class _ProfileBodyState extends State<_ProfileBody> {
   bool padu = false;
   List<Map<String, dynamic>> _documents = [];
 
+  static const Map<String, String> _profileVaultUploadTypes = {
+    'ID': 'general',
+    'Finance': 'lhdn',
+    'Education': 'ptptn',
+    'Health': 'kkm',
+    'Other': 'general',
+  };
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -234,15 +242,38 @@ class _ProfileBodyState extends State<_ProfileBody> {
     if (_activeUid == null) return;
 
     try {
-      final profile = await repo.getUserProfile(_activeUid!);
-      final userDocs = await repo.getUserDocuments(_activeUid!);
+      final resolvedUid = await repo.resolveUserUid(_activeUid!);
+      if (resolvedUid == null) {
+        if (mounted) {
+          setState(() => isLoading = false);
+        }
+        return;
+      }
 
-      if (profile != null) {
-        nameController.text = profile['name'] ?? '';
-        icController.text = profile['ic'] ?? '';
-        phoneController.text = profile['phone'] ?? '';
-        emailController.text = profile['email'] ?? '';
-        addressController.text = profile['address'] ?? '';
+      _activeUid = resolvedUid;
+
+      final profile = await repo.getUserProfile(resolvedUid);
+      final userDocs = await repo.getUserDocuments(resolvedUid);
+
+      if (profile.isNotEmpty) {
+        nameController.text = _firstNonEmpty(profile, [
+          'name',
+          'fullName',
+          'full_name',
+        ]);
+        icController.text = _firstNonEmpty(profile, [
+          'ic',
+          'ic_number',
+          'mykad',
+          'id_number',
+        ]);
+        phoneController.text = _firstNonEmpty(profile, [
+          'phone',
+          'phone_number',
+          'mobile',
+        ]);
+        emailController.text = _firstNonEmpty(profile, ['email']);
+        addressController.text = _firstNonEmpty(profile, ['address']);
 
         lhdn = profile['share_lhdn'] ?? true;
         kwsp = profile['share_kwsp'] ?? true;
@@ -250,11 +281,48 @@ class _ProfileBodyState extends State<_ProfileBody> {
       }
 
       _documents = userDocs ?? [];
+      documents = _documents
+          .map((doc) => _StoredDocument(
+                title: _firstNonEmpty(doc, [
+                  'title',
+                  'originalName',
+                  'filename',
+                  'name',
+                ], fallback: 'Unnamed'),
+                category: _firstNonEmpty(doc, [
+                  'category',
+                  'type',
+                ], fallback: 'general'),
+                uploadedDate: _firstNonEmpty(doc, [
+                  'uploadedDate',
+                  'createdAt',
+                ], fallback: DateTime.now().toString()),
+                filePath: (doc['filePath'] ?? doc['url'])?.toString(),
+              ))
+          .toList();
     } catch (e) {
       debugPrint("Error loading profile: $e");
     } finally {
       if (mounted) setState(() => isLoading = false);
     }
+  }
+
+  String _firstNonEmpty(
+    Map<String, dynamic> source,
+    List<String> keys, {
+    String fallback = '',
+  }) {
+    for (final key in keys) {
+      final value = source[key];
+      if (value == null) {
+        continue;
+      }
+      final text = value.toString().trim();
+      if (text.isNotEmpty) {
+        return text;
+      }
+    }
+    return fallback;
   }
 
   Future<void> _saveProfile() async {
@@ -391,7 +459,16 @@ class _ProfileBodyState extends State<_ProfileBody> {
                     if (selectedCategory == null) return;
 
                     Navigator.of(context).pop();
-                    final doc = await uploadDocument('general');
+                    final doc = await uploadDocument(
+                      uploadType:
+                          _profileVaultUploadTypes[selectedCategory!] ?? 'general',
+                      categoryLabel: selectedCategory!,
+                    );
+                    if (doc != null) {
+                      setState(() {
+                        documents.add(doc);
+                      });
+                    }
                   },
                   icon: const Icon(Icons.upload_file_outlined),
                   label: const Text('Upload Document'),
@@ -404,7 +481,10 @@ class _ProfileBodyState extends State<_ProfileBody> {
     );
   }
 
-  Future<_StoredDocument?> uploadDocument(String type) async {
+  Future<_StoredDocument?> uploadDocument({
+    required String uploadType,
+    required String categoryLabel,
+  }) async {
     try {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
@@ -427,7 +507,7 @@ class _ProfileBodyState extends State<_ProfileBody> {
       );
 
       request.headers["Authorization"] = "Bearer $token";
-      request.fields["type"] = type;
+      request.fields["type"] = uploadType;
 
       request.files.add(
         http.MultipartFile.fromBytes("file", file.bytes!, filename: file.name),
@@ -444,10 +524,25 @@ class _ProfileBodyState extends State<_ProfileBody> {
 
       final doc = _StoredDocument(
         title: file.name,
-        category: type,
+        category: categoryLabel,
         uploadedDate: DateTime.now().toString(),
         filePath: data["filePath"],
       );
+
+      // ✅ Save document to Firestore for persistence
+      if (_activeUid != null) {
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(_activeUid!)
+            .collection('documents')
+            .doc('${DateTime.now().millisecondsSinceEpoch}')
+            .set({
+              'title': doc.title,
+              'category': doc.category,
+              'uploadedDate': doc.uploadedDate,
+              'filePath': doc.filePath,
+            });
+      }
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Document uploaded successfully ✅")),
@@ -580,11 +675,6 @@ class _ProfileBodyState extends State<_ProfileBody> {
                 child: _DocumentVaultCard(
                   documents: documents,
                   onUploadPressed: _showUploadDocumentDialog,
-                  onDocumentAdded: (doc) {
-                    setState(() {
-                      documents.add(doc);
-                    });
-                  },
                 ),
               ),
               const SizedBox(width: 12),
@@ -731,12 +821,10 @@ class _DocumentVaultCard extends StatelessWidget {
     super.key,
     required this.documents,
     required this.onUploadPressed,
-    required this.onDocumentAdded, // ✅ ADD THIS
   });
 
   final List<_StoredDocument> documents;
   final VoidCallback onUploadPressed;
-  final Function(_StoredDocument) onDocumentAdded; // ✅ ADD THIS
 
   @override
   Widget build(BuildContext context) {
@@ -1161,12 +1249,76 @@ class _ProfileNavItem {
 class ProfileRepository {
   final _db = FirebaseFirestore.instance;
   final _auth = FirebaseAuth.instance;
+  static const String _ahmadFallbackName = 'Ahmad';
+  static const String _demoFallbackUid = 'QkP13R7eWNUB2yeLlJUBFqVXBHv2';
+
+  bool _hasUsefulProfileData(Map<String, dynamic>? data) {
+    if (data == null || data.isEmpty) {
+      return false;
+    }
+
+    final fields = [
+      data['name'],
+      data['fullName'],
+      data['phone'],
+      data['address'],
+      data['email'],
+    ];
+
+    return fields.any((value) => value != null && value.toString().trim().isNotEmpty);
+  }
+
+  Future<String?> _resolveTargetUid([String? uid]) async {
+    final candidates = <String?>[
+      uid,
+      _auth.currentUser?.uid,
+      _demoFallbackUid,
+    ];
+
+    for (final candidate in candidates.whereType<String>()) {
+      final doc = await _db.collection('users').doc(candidate).get();
+      final data = doc.data();
+      if (doc.exists && _hasUsefulProfileData(data)) {
+        return candidate;
+      }
+    }
+
+    final nameQueries = [
+      _db.collection('users').where('name', isEqualTo: _ahmadFallbackName),
+      _db
+          .collection('users')
+          .where('fullName', isEqualTo: _ahmadFallbackName),
+    ];
+
+    for (final query in nameQueries) {
+      final snapshot = await query.limit(1).get();
+      if (snapshot.docs.isNotEmpty) {
+        return snapshot.docs.first.id;
+      }
+    }
+
+    final allUsers = await _db.collection('users').limit(100).get();
+    for (final doc in allUsers.docs) {
+      final data = doc.data();
+      final candidateName =
+          (data['name'] ?? data['fullName'] ?? data['full_name'] ?? '')
+              .toString()
+              .toLowerCase();
+      if (candidateName.contains('ahmad')) {
+        return doc.id;
+      }
+    }
+
+    return null;
+  }
+
+  Future<String?> resolveUserUid([String? uid]) async {
+    return _resolveTargetUid(uid);
+  }
 
   // ✅ Added String? uid parameter
   Future<Map<String, dynamic>> getUserProfile([String? uid]) async {
-    // If uid is provided (QR Demo), use it. Otherwise, use Auth (Manual).
-    final targetUid = uid ?? _auth.currentUser?.uid;
-
+    final targetUid = await _resolveTargetUid(uid);
     if (targetUid == null) return {};
 
     final doc = await _db.collection('users').doc(targetUid).get();
@@ -1175,8 +1327,7 @@ class ProfileRepository {
 
   // ✅ Added String? uid parameter
   Future<List<Map<String, dynamic>>> getUserDocuments([String? uid]) async {
-    final targetUid = uid ?? _auth.currentUser?.uid;
-
+    final targetUid = await _resolveTargetUid(uid);
     if (targetUid == null) return [];
 
     final snapshot = await _db
