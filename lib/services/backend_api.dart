@@ -2,7 +2,7 @@ class BackendApi {
   BackendApi._();
 
   static const String defaultBaseUrl =
-      'https://mygov-backend-hfyxxwdvza-as.a.run.app';
+      'https://mygov-backend-947969904935.asia-southeast1.run.app';
 
   static const String configuredBaseUrl = String.fromEnvironment(
     'BACKEND_API_BASE_URL',
