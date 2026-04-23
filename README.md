@@ -1,5 +1,7 @@
-# prettypie_myAI
-A unified platform that brings multiple government services into one system. Users can perform tasks like renewing driving licenses, paying income tax, and accessing public services without switching between different apps. The goal is to provide a simpler, faster, and more convenient digital experience for citizens.
+# SmartGOV - Prettypie
+🚀 Overview
+
+SmartGov is a one-stop government service platform designed to collapse the "Bureaucratic Friction Funnel". It replaces fragmented portals with a Unified Digital Ecosystem that proactively manages civic tasks—from tax payments to welfare eligibility—using Gemini 2.0.
 
 ## Deployment GCloud Run Link
 https://mygov-frontend-947969904935.asia-southeast1.run.app
