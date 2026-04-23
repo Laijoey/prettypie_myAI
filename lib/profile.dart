@@ -223,7 +223,7 @@ class _ProfileBodyState extends State<_ProfileBody> {
     _activeUid =
         args ??
         FirebaseAuth.instance.currentUser?.uid ??
-        "QkP13R7eWNUB2yeLlJUBFqVXBHv2";
+        "YkE0XwfxhvbVayjkpcLLcyyQWC73";
 
     if (isLoading) {
       _loadProfile();
@@ -235,46 +235,58 @@ class _ProfileBodyState extends State<_ProfileBody> {
 
     try {
       final resolvedUid = await repo.resolveUserUid(_activeUid!);
+      print("UID USED: $_activeUid");
+      print("🟢 LOAD UID (resolved): $resolvedUid");
+      print("🟢 LOAD UID (active): $_activeUid");
       if (resolvedUid == null) {
-        if (mounted) {
-          setState(() => isLoading = false);
-        }
+        setState(() => isLoading = false);
         return;
       }
 
       _activeUid = resolvedUid;
 
-      final userDocs = await repo.getUserDocuments(resolvedUid);
+      // ✅ LOAD PROFILE
+      final profile = await repo.getUserProfile(_activeUid!);
 
-        nameController.text = 'Ahmad Bin Abdullah';
-        icController.text = '980512-14-5677';
-        phoneController.text = '011-2345 6789';
-        emailController.text = 'ahmad.abdullah@gmail.com';
-        addressController.text =
-          'No.14, Jalan Maju 3, Taman Sejahtera, 43000 Kajang, Selangor';
-        lhdn = true;
-        kwsp = true;
-        padu = false;
+      if (profile != null) {
+        nameController.text = profile['name'] ?? '';
+        icController.text = profile['ic'] ?? '';
+        phoneController.text = profile['phone'] ?? '';
+        emailController.text = profile['email'] ?? '';
+        addressController.text = profile['address'] ?? '';
+
+        lhdn = profile['share_lhdn'] ?? true;
+        kwsp = profile['shaer_kwsp'] ?? true;
+        padu = profile['share_padu'] ?? false;
+      }
+
+      // ✅ LOAD DOCUMENTS
+      final userDocs = await repo.getUserDocuments(_activeUid!);
 
       _documents = userDocs ?? [];
+
       documents = _documents
-          .map((doc) => _StoredDocument(
-                title: _firstNonEmpty(doc, [
-                  'title',
-                  'originalName',
-                  'filename',
-                  'name',
-                ], fallback: 'Unnamed'),
-                category: _firstNonEmpty(doc, [
-                  'category',
-                  'type',
-                ], fallback: 'general'),
-                uploadedDate: _firstNonEmpty(doc, [
-                  'uploadedDate',
-                  'createdAt',
-                ], fallback: DateTime.now().toString()),
-                filePath: (doc['filePath'] ?? doc['url'])?.toString(),
-              ))
+          .map(
+            (doc) => _StoredDocument(
+              title: _firstNonEmpty(doc, [
+                'title',
+                'fileName',
+                'originalName',
+                'filename',
+                'name',
+              ], fallback: 'Unnamed'),
+
+              category: _firstNonEmpty(doc, [
+                'category',
+                'type',
+              ], fallback: 'general'),
+
+              uploadedDate: (doc['uploadedDate'] ?? doc['createdAt'] ?? '')
+                  .toString(),
+
+              filePath: doc['filePath']?.toString(),
+            ),
+          )
           .toList();
     } catch (e) {
       debugPrint("Error loading profile: $e");
@@ -310,6 +322,9 @@ class _ProfileBodyState extends State<_ProfileBody> {
       'phone': phoneController.text.trim(),
       'email': emailController.text.trim(),
       'address': addressController.text.trim(),
+      'share_lhdn': lhdn,
+      'share_kwsp': kwsp,
+      'share_padu': padu,
     });
 
     if (mounted) {
@@ -496,24 +511,53 @@ class _ProfileBodyState extends State<_ProfileBody> {
         title: file.name,
         category: categoryLabel,
         uploadedDate: DateTime.now().toString(),
-        filePath: data["filePath"],
+        filePath: data["url"],
       );
 
       // Keep Firestore persistence best-effort so permission issues do not block upload.
       if (_activeUid != null) {
         try {
-          await FirebaseFirestore.instance
-              .collection('users')
-              .doc(_activeUid!)
-              .collection('documents')
-              .doc('${DateTime.now().millisecondsSinceEpoch}')
-              .set({
-                'title': doc.title,
-                'category': doc.category,
-                'uploadedDate': doc.uploadedDate,
-                'filePath': doc.filePath,
-                'type': 'general',
-              });
+          if (_activeUid != null) {
+            await repo.saveDocument(_activeUid!, {
+              'title': doc.title,
+              'category': doc.category,
+              'uploadedDate': doc.uploadedDate,
+              'filePath': doc.filePath,
+              'type': 'general',
+            });
+
+            // ✅ FORCE REFRESH FROM FIRESTORE
+            final userDocs = await repo.getUserDocuments(_activeUid!);
+
+            setState(() {
+              _documents = userDocs ?? [];
+
+              documents = _documents
+                  .map(
+                    (doc) => _StoredDocument(
+                      title: _firstNonEmpty(doc, [
+                        'title',
+                        'fileName',
+                        'originalName',
+                        'filename',
+                        'name',
+                      ], fallback: 'Unnamed'),
+
+                      category: _firstNonEmpty(doc, [
+                        'category',
+                        'type',
+                      ], fallback: 'general'),
+
+                      uploadedDate:
+                          (doc['uploadedDate'] ?? doc['createdAt'] ?? '')
+                              .toString(),
+
+                      filePath: doc['filePath']?.toString(),
+                    ),
+                  )
+                  .toList();
+            });
+          }
         } catch (e) {
           debugPrint('Non-blocking document metadata save failed: $e');
         }
@@ -1222,15 +1266,18 @@ class _ProfileNavItem {
 }
 
 class ProfileRepository {
-  final _db = FirebaseFirestore.instance;
-  final _auth = FirebaseAuth.instance;
-  static const String _ahmadFallbackName = 'Ahmad';
-  static const String _demoFallbackUid = 'QkP13R7eWNUB2yeLlJUBFqVXBHv2';
+  final FirebaseFirestore _db = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+
+  static const String _ahmadFallbackName = 'Ahmad Bin Abdullah';
+  static const String _demoFallbackUid = 'YkE0XwfxhvbVayjkpcLLcyyQWC73';
+
+  // -------------------------------
+  // INTERNAL HELPERS
+  // -------------------------------
 
   bool _hasUsefulProfileData(Map<String, dynamic>? data) {
-    if (data == null || data.isEmpty) {
-      return false;
-    }
+    if (data == null || data.isEmpty) return false;
 
     final fields = [
       data['name'],
@@ -1240,85 +1287,130 @@ class ProfileRepository {
       data['email'],
     ];
 
-    return fields.any((value) => value != null && value.toString().trim().isNotEmpty);
+    return fields.any(
+      (value) => value != null && value.toString().trim().isNotEmpty,
+    );
   }
 
   Future<String?> _resolveTargetUid([String? uid]) async {
-    final candidates = <String?>[
-      uid,
-      _auth.currentUser?.uid,
-      _demoFallbackUid,
-    ];
+    try {
+      final candidates = <String?>[
+        uid,
+        _auth.currentUser?.uid,
+        _demoFallbackUid,
+      ];
 
-    for (final candidate in candidates.whereType<String>()) {
-      final doc = await _db.collection('users').doc(candidate).get();
-      final data = doc.data();
-      if (doc.exists && _hasUsefulProfileData(data)) {
-        return candidate;
+      // 1️⃣ Direct UID check
+      for (final candidate in candidates.whereType<String>()) {
+        final doc = await _db.collection('users').doc(candidate).get();
+        final data = doc.data();
+
+        if (doc.exists && _hasUsefulProfileData(data)) {
+          return candidate;
+        }
       }
-    }
 
-    final nameQueries = [
-      _db.collection('users').where('name', isEqualTo: _ahmadFallbackName),
-      _db
-          .collection('users')
-          .where('fullName', isEqualTo: _ahmadFallbackName),
-    ];
+      // 2️⃣ Exact name match
+      final nameQueries = [
+        _db.collection('users').where('name', isEqualTo: _ahmadFallbackName),
+        _db
+            .collection('users')
+            .where('fullName', isEqualTo: _ahmadFallbackName),
+      ];
 
-    for (final query in nameQueries) {
-      final snapshot = await query.limit(1).get();
-      if (snapshot.docs.isNotEmpty) {
-        return snapshot.docs.first.id;
+      for (final query in nameQueries) {
+        final snapshot = await query.limit(1).get();
+        if (snapshot.docs.isNotEmpty) {
+          return snapshot.docs.first.id;
+        }
       }
-    }
 
-    final allUsers = await _db.collection('users').limit(100).get();
-    for (final doc in allUsers.docs) {
-      final data = doc.data();
-      final candidateName =
-          (data['name'] ?? data['fullName'] ?? data['full_name'] ?? '')
-              .toString()
-              .toLowerCase();
-      if (candidateName.contains('ahmad')) {
-        return doc.id;
+      // 3️⃣ Fuzzy match
+      final allUsers = await _db.collection('users').limit(100).get();
+      for (final doc in allUsers.docs) {
+        final data = doc.data();
+        final name =
+            (data['name'] ?? data['fullName'] ?? data['full_name'] ?? '')
+                .toString()
+                .toLowerCase();
+
+        if (name.contains('ahmad')) {
+          return doc.id;
+        }
       }
-    }
 
-    return null;
+      return null;
+    } catch (e) {
+      print("UID resolve error: $e");
+      return null;
+    }
   }
+
+  // -------------------------------
+  // PUBLIC METHODS
+  // -------------------------------
 
   Future<String?> resolveUserUid([String? uid]) async {
     return _resolveTargetUid(uid);
   }
 
-  // ✅ Added String? uid parameter
-  Future<Map<String, dynamic>> getUserProfile([String? uid]) async {
-    final targetUid = await _resolveTargetUid(uid);
-    if (targetUid == null) return {};
+  // ✅ GET PROFILE
+  Future<Map<String, dynamic>> getUserProfile(String uid) async {
+    try {
+      final doc = await _db.collection('users').doc(uid).get();
+      if (!doc.exists) return {};
 
-    final doc = await _db.collection('users').doc(targetUid).get();
-    return doc.data() ?? {};
+      return doc.data() ?? {};
+    } catch (e) {
+      print("Error fetching profile: $e");
+      return {};
+    }
   }
 
-  // ✅ Added String? uid parameter
-  Future<List<Map<String, dynamic>>> getUserDocuments([String? uid]) async {
-    final targetUid = await _resolveTargetUid(uid);
-    if (targetUid == null) return [];
+  // ✅ UPDATE PROFILE (WITH TIMESTAMP)
+  Future<void> updateProfile(String uid, Map<String, dynamic> data) async {
+    try {
+      await _db.collection('users').doc(uid).set({
+        ...data,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    } catch (e) {
+      print("Error updating profile: $e");
+      rethrow;
+    }
+  }
 
+  // ✅ GET DOCUMENTS (FIXED + SORTED)
+  Future<List<Map<String, dynamic>>> getUserDocuments(String uid) async {
     final snapshot = await _db
-        .collection('users')
-        .doc(targetUid)
         .collection('documents')
+        .where('uid', isEqualTo: uid)
+        .orderBy('uploadedDate', descending: true)
         .get();
 
     return snapshot.docs.map((d) => d.data()).toList();
   }
 
-  // ✅ Added String? uid parameter
-  Future<void> updateProfile(String uid, Map<String, dynamic> data) async {
-    await _db.collection('users').doc(uid).set({
-      ...data,
-      'updatedAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
+  // ✅ SAVE DOCUMENT (🔥 THIS FIXES YOUR MAIN ISSUE)
+  Future<void> saveDocument(String uid, Map<String, dynamic> data) async {
+    try {
+      await FirebaseFirestore.instance.collection('documents').add({
+        ...data,
+
+        'uid': uid,
+
+        // ✅ filename fields
+        'fileName': data['fileName'], // original filename
+        'title': data['title'], // display title (optional)
+
+        'uploadedDate': FieldValue.serverTimestamp(),
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
+      print("✅ Document saved with filename");
+    } catch (e) {
+      print("❌ Error saving document: $e");
+      rethrow;
+    }
   }
 }

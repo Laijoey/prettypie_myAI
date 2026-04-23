@@ -132,20 +132,24 @@ app.post("/upload-doc", verifyUser, upload.single("file"), async (req, res) => {
       },
     });
 
-    blobStream.on("error", (err) => {
-      console.error("Upload error:", err);
-      return res.status(500).json({
-        success: false,
-        error: err.message,
-      });
-    });
-
     blobStream.on("finish", async () => {
       try {
-        // ✅ MAKE FILE PUBLIC
         await blob.makePublic();
 
         const publicUrl = `https://storage.googleapis.com/${bucket.name}/${blob.name}`;
+
+        // ✅ ADD THIS: SAVE TO FIRESTORE
+        const db = admin.firestore();
+
+        const db = admin.firestore();
+
+        await db.collection("documents").add({
+          uid: uid, // 🔑 link to user
+          title: file.originalname,
+          type: type,
+          filePath: publicUrl,
+          uploadedDate: admin.firestore.FieldValue.serverTimestamp(),
+        });
 
         return res.json({
           success: true,
@@ -156,6 +160,7 @@ app.post("/upload-doc", verifyUser, upload.single("file"), async (req, res) => {
             url: publicUrl,
           },
         });
+
       } catch (err) {
         console.error("Public URL error:", err);
         return res.status(500).json({
@@ -287,22 +292,6 @@ app.post("/chat", verifyUser, async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-
-async function getUserTaxData(uid) {
-  return {
-    income: 85000,
-    epf: 9000,
-    donation: 1200,
-  };
-}
-
-async function calculateTax(uid) {
-  return {
-    estimatedTax: 2150,
-    reliefs: ["EPF", "Lifestyle"],
-    recommendation: "You can claim more lifestyle relief",
-  };
-}
 
 // ================= START SERVER (MUST BE LAST) =================
 const DEFAULT_PORT = Number(process.env.PORT) || 8080;

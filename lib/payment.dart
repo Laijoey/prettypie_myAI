@@ -6,6 +6,9 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'services/backend_api.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
+import 'package:pdf/pdf.dart';
 
 class PaymentPage extends StatelessWidget {
   const PaymentPage({super.key, this.initialBill});
@@ -1468,8 +1471,8 @@ class _CardDetailsPageState extends State<_CardDetailsPage> {
                           referenceNo: widget.referenceNo,
                           amount: widget.amount,
                           paymentMethod: 'Debit / Credit Card',
-                            billTitle: widget.billTitle,
-                            dueDate: widget.dueDate,
+                          billTitle: widget.billTitle,
+                          dueDate: widget.dueDate,
                         ),
                       ),
                     );
@@ -1990,6 +1993,444 @@ class _PaymentConfirmationPageState extends State<_PaymentConfirmationPage> {
     ).popUntil((route) => route.settings.name == '/payments' || route.isFirst);
   }
 
+  void _showReceiptDialog() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // 🔷 HEADER (your SmartGOV style)
+                Container(
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF214B74),
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(18),
+                    ),
+                  ),
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF7C51A),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(
+                          Icons.shield_outlined,
+                          color: Color(0xFF123A61),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      const Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'SmartGOV',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          Text(
+                            'Official Payment Receipt',
+                            style: TextStyle(
+                              color: Color(0xFFD0D8E2),
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+
+                // 🔽 BODY
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      // ✅ STATUS ICON
+                      Container(
+                        width: 70,
+                        height: 70,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE7F7EE),
+                          borderRadius: BorderRadius.circular(35),
+                        ),
+                        child: const Icon(
+                          Icons.check_circle,
+                          color: Color(0xFF2E9E63),
+                          size: 44,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+
+                      const Text(
+                        'Payment Successful',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF1E2D3F),
+                        ),
+                      ),
+
+                      const SizedBox(height: 6),
+                      Text(
+                        _formatTimestamp(_processedAt),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF6F8094),
+                        ),
+                      ),
+
+                      const SizedBox(height: 14),
+                      const Divider(),
+
+                      // 📄 DETAILS CARD
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF7F8FA),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFD9DEE5)),
+                        ),
+                        child: Column(
+                          children: [
+                            _receiptRow('Agency', widget.agency),
+                            _receiptRow('Reference', widget.referenceNo),
+                            _receiptRow('Transaction ID', _transactionId),
+                            _receiptRow('Payment Method', widget.paymentMethod),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 14),
+
+                      // 💰 AMOUNT SECTION (highlight)
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEFF4FA),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Column(
+                          children: [
+                            const Text(
+                              'TOTAL PAID',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF6F8094),
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'RM ${widget.amount.toStringAsFixed(2)}',
+                              style: const TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.w900,
+                                color: Color(0xFF1F4468),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 12),
+
+                      // 🟢 STATUS BADGE
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 6,
+                          horizontal: 14,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE7F7EE),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: const Text(
+                          'SUCCESS',
+                          style: TextStyle(
+                            color: Color(0xFF2E9E63),
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 14),
+
+                      const Divider(),
+
+                      const Text(
+                        'This is a system-generated receipt.\nNo signature required.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Color(0xFF6F8094),
+                        ),
+                      ),
+
+                      const SizedBox(height: 14),
+
+                      // 🔘 BUTTONS
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton(
+                          onPressed: _downloadReceipt,
+                          child: const Text('Download PDF'),
+                        ),
+                      ),
+
+                      const SizedBox(height: 10),
+
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton(
+                          onPressed: () => Navigator.pop(context),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: const Color(0xFF1F4468),
+                          ),
+                          child: const Text('Close'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _receiptRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 13,
+              color: Color(0xFF6F8094),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          Flexible(
+            child: Text(
+              value,
+              textAlign: TextAlign.right,
+              style: const TextStyle(
+                fontSize: 13,
+                color: Color(0xFF1E2D3F),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _downloadReceipt() async {
+    final pdf = pw.Document();
+
+    pdf.addPage(
+      pw.Page(
+        margin: const pw.EdgeInsets.all(24),
+        build: (context) {
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              // 🔷 HEADER
+              pw.Container(
+                padding: const pw.EdgeInsets.all(12),
+                decoration: pw.BoxDecoration(
+                  color: PdfColor.fromInt(0xFF214B74),
+                  borderRadius: pw.BorderRadius.circular(8),
+                ),
+                child: pw.Row(
+                  children: [
+                    pw.Container(
+                      width: 30,
+                      height: 30,
+                      decoration: pw.BoxDecoration(
+                        color: PdfColor.fromInt(0xFFF7C51A),
+                        borderRadius: pw.BorderRadius.circular(6),
+                      ),
+                    ),
+                    pw.SizedBox(width: 10),
+                    pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Text(
+                          'SmartGOV',
+                          style: pw.TextStyle(
+                            color: PdfColors.white,
+                            fontSize: 16,
+                            fontWeight: pw.FontWeight.bold,
+                          ),
+                        ),
+                        pw.Text(
+                          'Official Payment Receipt',
+                          style: pw.TextStyle(
+                            color: PdfColors.grey300,
+                            fontSize: 10,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+
+              pw.SizedBox(height: 16),
+
+              // ✅ STATUS
+              pw.Center(
+                child: pw.Column(
+                  children: [
+                    pw.Text(
+                      'PAYMENT SUCCESSFUL',
+                      style: pw.TextStyle(
+                        fontSize: 14,
+                        fontWeight: pw.FontWeight.bold,
+                      ),
+                    ),
+                    pw.SizedBox(height: 4),
+                    pw.Text(
+                      _formatTimestamp(_processedAt),
+                      style: const pw.TextStyle(fontSize: 10),
+                    ),
+                  ],
+                ),
+              ),
+
+              pw.SizedBox(height: 16),
+              pw.Divider(),
+
+              // 📄 DETAILS BOX
+              pw.Container(
+                padding: const pw.EdgeInsets.all(12),
+                decoration: pw.BoxDecoration(
+                  border: pw.Border.all(color: PdfColors.grey300),
+                  borderRadius: pw.BorderRadius.circular(8),
+                ),
+                child: pw.Column(
+                  children: [
+                    _pdfRow('Agency', widget.agency),
+                    _pdfRow('Reference', widget.referenceNo),
+                    _pdfRow('Transaction ID', _transactionId),
+                    _pdfRow('Payment Method', widget.paymentMethod),
+                  ],
+                ),
+              ),
+
+              pw.SizedBox(height: 16),
+
+              // 💰 AMOUNT BOX
+              pw.Container(
+                width: double.infinity,
+                padding: const pw.EdgeInsets.all(14),
+                decoration: pw.BoxDecoration(
+                  color: PdfColor.fromInt(0xFFEFF4FA),
+                  borderRadius: pw.BorderRadius.circular(8),
+                ),
+                child: pw.Column(
+                  children: [
+                    pw.Text(
+                      'TOTAL PAID',
+                      style: pw.TextStyle(
+                        fontSize: 10,
+                        color: PdfColors.grey600,
+                      ),
+                    ),
+                    pw.SizedBox(height: 4),
+                    pw.Text(
+                      'RM ${widget.amount.toStringAsFixed(2)}',
+                      style: pw.TextStyle(
+                        fontSize: 18,
+                        fontWeight: pw.FontWeight.bold,
+                        color: PdfColor.fromInt(0xFF1F4468),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              pw.SizedBox(height: 12),
+
+              // 🟢 STATUS BADGE
+              pw.Center(
+                child: pw.Container(
+                  padding: const pw.EdgeInsets.symmetric(
+                    vertical: 4,
+                    horizontal: 10,
+                  ),
+                  decoration: pw.BoxDecoration(
+                    color: PdfColor.fromInt(0xFFE7F7EE),
+                    borderRadius: pw.BorderRadius.circular(20),
+                  ),
+                  child: pw.Text(
+                    'SUCCESS',
+                    style: pw.TextStyle(
+                      color: PdfColor.fromInt(0xFF2E9E63),
+                      fontWeight: pw.FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+
+              pw.Spacer(),
+
+              // 🔽 FOOTER
+              pw.Divider(),
+              pw.Center(
+                child: pw.Text(
+                  'This is a system-generated receipt. No signature required.',
+                  style: const pw.TextStyle(fontSize: 9),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    await Printing.layoutPdf(onLayout: (format) async => pdf.save());
+  }
+
+  pw.Widget _pdfRow(String label, String value) {
+    return pw.Padding(
+      padding: const pw.EdgeInsets.symmetric(vertical: 4),
+      child: pw.Row(
+        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+        children: [
+          pw.Text(
+            label,
+            style: pw.TextStyle(fontSize: 10, color: PdfColors.grey700),
+          ),
+          pw.Text(
+            value,
+            style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -2026,7 +2467,8 @@ class _PaymentConfirmationPageState extends State<_PaymentConfirmationPage> {
                     ),
                   ),
                   const SizedBox(height: 6),
-                  if (widget.billTitle != null && widget.billTitle!.isNotEmpty) ...[
+                  if (widget.billTitle != null &&
+                      widget.billTitle!.isNotEmpty) ...[
                     Text(
                       'Bill: ${widget.billTitle}',
                       style: const TextStyle(
@@ -2196,6 +2638,29 @@ class _PaymentConfirmationPageState extends State<_PaymentConfirmationPage> {
                               child: const Text(
                                 'Back to Payments',
                                 style: TextStyle(fontWeight: FontWeight.w700),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          SizedBox(
+                            width: double.infinity,
+                            height: 46,
+                            child: OutlinedButton(
+                              onPressed: _showReceiptDialog,
+                              style: OutlinedButton.styleFrom(
+                                side: const BorderSide(
+                                  color: Color(0xFF1F4468),
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              child: const Text(
+                                'View Receipt',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF1F4468),
+                                ),
                               ),
                             ),
                           ),
