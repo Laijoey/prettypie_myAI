@@ -6,6 +6,15 @@ SmartGov is a one-stop government service platform designed to collapse the "Bur
 ## Deployment GCloud Run Link
 https://mygov-frontend-947969904935.asia-southeast1.run.app
 
+## Presentation Slide Link
+https://canva.link/aeoo8d7kbnmvgro
+
+## 🏛️ Sovereign Architecture Stack
+- **The Brain (AI Orchestration)**: Google AI Studio, Gemini 2.0, and Firebase Genkit.
+- **The Engine (Core Backend)**: Node.js/Firebase managing auth and state.
+- **The Surface (UI/UX)**: Flutter Web for responsive frontend delivery.
+- **The Base (Data Layer)**: Mock JSON APIs simulating LHDN, KWSP, and JPJ pipelines.
+
 ## Run Whole App (AI + Backend + Flutter)
 
 From project root:
